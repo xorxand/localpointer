@@ -316,20 +316,8 @@
 .scm-view .monaco-list .monaco-list-row .resource > .name > .monaco-icon-label > .actions,
 .scm-view .monaco-list .monaco-list-row .history-item > .actions,
 .scm-view .monaco-list .monaco-list-row .history-item-change > .label-container > .monaco-icon-label > .actions {
-	display: none;
-	max-width: fit-content;
-}
-
-.scm-view .monaco-list .monaco-list-row:hover .resource-group > .actions,
-.scm-view .monaco-list .monaco-list-row.focused .resource-group > .actions,
-.scm-view .monaco-list .monaco-list-row:hover .resource > .name > .monaco-icon-label > .actions,
-.scm-view .monaco-list .monaco-list-row.focused .resource > .name > .monaco-icon-label > .actions,
-.scm-view .monaco-list:not(.selection-multiple) .monaco-list-row .resource:hover > .actions,
-.scm-view .monaco-list .monaco-list-row:hover .history-item > .actions,
-.scm-view .monaco-list .monaco-list-row.focused .history-item > .actions,
-.scm-view .monaco-list .monaco-list-row:hover .history-item-change > .label-container > .monaco-icon-label > .actions,
-.scm-view .monaco-list .monaco-list-row.focused .history-item-change > .label-container > .monaco-icon-label > .actions {
 	display: block;
+	max-width: fit-content;
 }
 
 .scm-view .monaco-list .monaco-list-row.force-no-hover,
@@ -547,15 +535,8 @@
 
 .scm-repositories-view .monaco-list .monaco-list-row .scm-artifact-group > .actions,
 .scm-repositories-view .monaco-list .monaco-list-row .scm-artifact > .actions {
-	display: none;
-	max-width: fit-content;
-}
-
-.scm-repositories-view .monaco-list .monaco-list-row:hover .scm-artifact-group > .actions,
-.scm-repositories-view .monaco-list .monaco-list-row.focused .scm-artifact-group > .actions,
-.scm-repositories-view .monaco-list .monaco-list-row:hover .scm-artifact > .actions,
-.scm-repositories-view .monaco-list .monaco-list-row.focused .scm-artifact > .actions {
 	display: block;
+	max-width: fit-content;
 }
 
 .scm-view.scm-repositories-view .monaco-highlighted-label {

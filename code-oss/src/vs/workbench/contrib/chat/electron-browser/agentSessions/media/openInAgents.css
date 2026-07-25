@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-/* "Open in Agents" titlebar widget — icon-only at rest, expands on hover/focus. */
+/* "Open in Agents" titlebar widget — label visible at rest, emphasized on hover/focus. */
 .monaco-workbench .open-in-agents-titlebar-widget {
 	display: inline-flex;
 	align-items: center;
@@ -45,9 +45,9 @@
 
 .monaco-workbench .open-in-agents-titlebar-widget > .open-in-agents-titlebar-widget-label {
 	display: inline-block;
-	max-width: 0;
-	opacity: 0;
-	margin-left: 0;
+	max-width: 200px;
+	opacity: 0.6;
+	margin-left: 6px;
 	color: var(--vscode-foreground);
 	font: inherit;
 	overflow: hidden;

@@ -246,7 +246,8 @@
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .recently-opened-delete-button {
-	visibility: hidden;
+	visibility: visible;
+	opacity: 0.6;
 	position: absolute;
 	right: 0;
 	top: 50%;
@@ -265,7 +266,7 @@
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .recently-opened li:hover .recently-opened-delete-button,
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .recently-opened li:focus-within .recently-opened-delete-button {
-	visibility: visible;
+	opacity: 1;
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideCategories .recently-opened-delete-button:hover {
@@ -966,12 +967,13 @@
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .hide-category-button {
-	visibility: hidden;
+	visibility: visible;
+	opacity: 0.6;
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .getting-started-category:focus-within .hide-category-button,
 .monaco-workbench .part.editor > .content .gettingStartedContainer .getting-started-category:hover .hide-category-button {
-	visibility: visible;
+	opacity: 1;
 }
 
 .monaco-workbench .part.editor > .content .gettingStartedContainer .gettingStartedSlideDetails .getting-started-step .step-description-container span {

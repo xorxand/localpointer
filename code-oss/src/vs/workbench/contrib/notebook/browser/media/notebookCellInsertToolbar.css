@@ -18,7 +18,7 @@
 	justify-content: center;
 	z-index: var(--z-index-notebook-cell-bottom-toolbar-container);
 	width: calc(100% - 32px);
-	opacity: 0;
+	opacity: 0.6;
 	padding: 0;
 	margin: 0 16px 0 16px;
 }

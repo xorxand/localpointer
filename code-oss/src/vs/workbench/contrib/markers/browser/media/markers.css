@@ -125,20 +125,19 @@
 	justify-content: center;
 }
 
-.markers-panel .monaco-tl-contents .actions .monaco-action-bar {
+.markers-panel .monaco-tl-contents > .marker-icon.quickFix {
 	display: none;
 }
 
-.markers-panel .monaco-list-row:hover .monaco-tl-contents > .marker-icon.quickFix,
-.markers-panel .monaco-list-row.selected .monaco-tl-contents > .marker-icon.quickFix,
-.markers-panel .monaco-list-row.focused .monaco-tl-contents > .marker-icon.quickFix {
-	display: none;
+.markers-panel .monaco-tl-contents .actions .monaco-action-bar {
+	display: block;
+	opacity: 0.6;
 }
 
 .markers-panel .monaco-list-row:hover .monaco-tl-contents .actions .monaco-action-bar,
 .markers-panel .monaco-list-row.selected .monaco-tl-contents .actions .monaco-action-bar,
 .markers-panel .monaco-list-row.focused .monaco-tl-contents .actions .monaco-action-bar {
-	display: block;
+	opacity: 1;
 }
 
 .markers-panel .monaco-tl-contents .actions,
@@ -191,9 +190,7 @@
 	display: flex;
 }
 
-.markers-panel .markers-table-container .monaco-table .monaco-list-row.selected .monaco-table-tr > .monaco-table-td.quickFix > .severity,
-.markers-panel .markers-table-container .monaco-table .monaco-list-row.focused .monaco-table-tr > .monaco-table-td.quickFix > .severity,
-.markers-panel .markers-table-container .monaco-table .monaco-list-row:hover .monaco-table-tr > .monaco-table-td.quickFix > .severity {
+.markers-panel .markers-table-container .monaco-table .monaco-list-row .monaco-table-tr > .monaco-table-td.quickFix > .severity {
 	display: none;
 }
 
@@ -202,13 +199,14 @@
 }
 
 .markers-panel .markers-table-container .monaco-table .monaco-list-row .monaco-table-tr > .monaco-table-td > .actions > .monaco-action-bar .action-item {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 }
 
 .markers-panel .markers-table-container .monaco-table .monaco-list-row.selected .monaco-table-tr > .monaco-table-td.quickFix > .actions > .monaco-action-bar .action-item,
 .markers-panel .markers-table-container .monaco-table .monaco-list-row.focused .monaco-table-tr > .monaco-table-td.quickFix > .actions > .monaco-action-bar .action-item,
 .markers-panel .markers-table-container .monaco-table .monaco-list-row:hover .monaco-table-tr > .monaco-table-td.quickFix > .actions > .monaco-action-bar .action-item {
-	display: flex;
+	opacity: 1;
 }
 
 .markers-panel .markers-table-container .monaco-table .monaco-list-row .monaco-table-tr > .monaco-table-td > .code > .monaco-link::before,

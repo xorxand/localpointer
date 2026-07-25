@@ -31,11 +31,6 @@
 }
 
 .monaco-workbench .viewlet .collapsible.header .actions {
-	width: 0; /* not using display: none for keyboard a11y reasons */
-}
-
-.monaco-workbench .viewlet .split-view-view:hover > .header .actions,
-.monaco-workbench .viewlet .collapsible.header.focused .actions {
 	width: initial;
 	flex: 1;
 }

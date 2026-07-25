@@ -18,6 +18,7 @@
 	display: flex;
 	align-items: center;
 	padding: 4px;
+	padding-right: 32px;
 	margin-top: 6px;
 	border-radius: var(--vscode-cornerRadius-medium);
 	min-height: 20px;
@@ -55,7 +56,7 @@
 	outline: none !important;
 }
 
-/* Chevron — right-aligned, visible on hover, keyboard focus, or when collapsed */
+/* Chevron — right-aligned, always visible (dimmed at rest) */
 .ci-status-widget-header .group-chevron {
 	position: absolute;
 	right: 4px;
@@ -68,15 +69,14 @@
 	align-items: center;
 	justify-content: center;
 	font-size: var(--vscode-codiconFontSize-compact, 12px);
-	visibility: hidden;
-	opacity: 0;
+	visibility: visible;
+	opacity: 0.6;
 }
 
 .ci-status-widget-header:hover .group-chevron,
 .ci-status-widget-header:focus-visible .group-chevron,
 .ci-status-widget-header.collapsed .group-chevron {
-	visibility: visible;
-	opacity: 0.7;
+	opacity: 1;
 }
 
 .ci-status-widget-header .group-chevron:hover {
@@ -235,9 +235,10 @@
 	color: var(--vscode-descriptionForeground);
 }
 
-/* Actions - float to the right, visible on hover */
+/* Actions - float to the right, always visible (dimmed at rest) */
 .ci-status-widget-check-actions {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 	flex: 0 0 auto;
 	flex-shrink: 0;
 	padding-right: 4px;
@@ -248,7 +249,7 @@
 .ci-status-widget-list .monaco-list-row.focused .ci-status-widget-check-actions,
 .ci-status-widget-list .monaco-list-row.selected .ci-status-widget-check-actions,
 .ci-status-widget-check:hover .ci-status-widget-check-actions {
-	display: flex;
+	opacity: 1;
 }
 
 .ci-status-widget-check-actions .monaco-action-bar {

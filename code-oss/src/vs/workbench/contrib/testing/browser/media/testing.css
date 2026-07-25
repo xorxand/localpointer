@@ -68,14 +68,15 @@
 	}
 
 	.monaco-action-bar {
-		display: none;
+		display: initial;
+		opacity: 0.6;
 		flex-shrink: 0;
 		margin-right: 0.8em;
 	}
 
 	&:hover, &.focused {
 		.monaco-action-bar {
-			display: initial;
+			opacity: 1;
 		}
 	}
 }
@@ -103,8 +104,13 @@
 	border-radius: 3px;
 }
 
-.test-explorer .monaco-list-row:not(.focused, :hover) .monaco-action-bar.testing-is-continuous-run .action-item {
-	display: none;
+.test-explorer .monaco-list-row .monaco-action-bar.testing-is-continuous-run .action-item {
+	opacity: 0.6;
+}
+
+.test-explorer .monaco-list-row:hover .monaco-action-bar.testing-is-continuous-run .action-item,
+.test-explorer .monaco-list-row.focused .monaco-action-bar.testing-is-continuous-run .action-item {
+	opacity: 1;
 }
 
 .test-explorer .monaco-list-row .monaco-action-bar.testing-is-continuous-run .action-item:last-child {

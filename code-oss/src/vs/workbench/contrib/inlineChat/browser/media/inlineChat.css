@@ -289,14 +289,8 @@
 	gap: 4px;
 }
 
-.monaco-workbench .inline-chat .status .actions.secondary {
+.monaco-workbench .inline-chat .status .actions.secondary:not(.has-no-actions) {
 	margin-left: auto;
-	display: none;
-}
-
-.monaco-workbench .inline-chat .status:hover .actions.secondary:not(.has-no-actions),
-.monaco-workbench .inline-chat:focus .status .actions.secondary:not(.has-no-actions),
-.monaco-workbench .inline-chat .status:focus-within .actions.secondary:not(.has-no-actions) {
 	display: inherit;
 }
 

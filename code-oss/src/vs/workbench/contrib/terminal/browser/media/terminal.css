@@ -385,7 +385,7 @@
 }
 
 .monaco-workbench .pane-body.integrated-terminal .terminal-tabs-chat-entry .terminal-tabs-chat-entry-delete {
-	display: none;
+	display: flex;
 	align-items: center;
 	justify-content: center;
 	width: 16px;
@@ -395,11 +395,6 @@
 	cursor: pointer;
 	opacity: 0.8;
 	flex-shrink: 0;
-}
-
-.monaco-workbench .pane-body.integrated-terminal .terminal-tabs-chat-entry:hover .terminal-tabs-chat-entry-delete,
-.monaco-workbench .pane-body.integrated-terminal .terminal-tabs-chat-entry:focus-within .terminal-tabs-chat-entry-delete {
-	display: flex;
 }
 
 .monaco-workbench .pane-body.integrated-terminal .terminal-tabs-chat-entry .terminal-tabs-chat-entry-delete:hover {
@@ -443,7 +438,7 @@
 }
 
 .monaco-workbench .pane-body.integrated-terminal .tabs-list .actions {
-	display: none;
+	display: block;
 }
 
 .monaco-workbench .pane-body.integrated-terminal .tabs-list .editable-tab .monaco-icon-name-container {
@@ -466,12 +461,6 @@
 
 .monaco-workbench .pane-body.integrated-terminal .tabs-list .actions .action-label {
 	padding: 2px;
-}
-
-.monaco-workbench .pane-body.integrated-terminal .tabs-list .monaco-list-row:hover .actions,
-.monaco-workbench .pane-body.integrated-terminal .tabs-list:focus-within .monaco-list-row.selected .actions,
-.monaco-workbench .pane-body.integrated-terminal .tabs-list:focus-within .monaco-list-row.focused .actions {
-	display: block;
 }
 
 .monaco-action-bar .action-item .single-terminal-tab {

@@ -175,11 +175,6 @@
 	font-size: 14px;
 }
 
-.interactive-item-container:not(:hover):not(:focus-within) .header .monaco-toolbar,
-.interactive-item-container:not(:hover):not(:focus-within) .header .monaco-toolbar .action-label {
-	display: none;
-}
-
 .interactive-item-container .header .monaco-toolbar .monaco-action-bar .actions-container {
 	gap: 4px;
 }
@@ -272,20 +267,9 @@
 .interactive-item-container.interactive-response:not(.chat-response-loading) .chat-footer-toolbar .chat-footer-details {
 	/* Complete response only */
 	display: block;
-	opacity: 0;
+	opacity: 1;
 	padding-top: 6px;
 	height: 22px;
-	transition: opacity 0.1s ease-in-out;
-}
-
-/* Show toolbar on hover and last response. Keep it visible when keyboard focus moves inside the response. */
-.interactive-item-container.interactive-response.chat-most-recent-response:not(.chat-response-loading) .chat-footer-toolbar,
-.interactive-item-container.interactive-response:not(.chat-response-loading):focus-within .chat-footer-toolbar,
-.interactive-item-container.interactive-response:not(.chat-response-loading):focus-within .chat-footer-toolbar .chat-footer-details,
-.interactive-item-container.interactive-response:not(.chat-response-loading).group-hovered .chat-footer-toolbar,
-.interactive-item-container.interactive-response:not(.chat-response-loading).group-hovered .chat-footer-toolbar .chat-footer-details {
-	opacity: 1;
-	transition: opacity 0.1s ease-in-out;
 }
 
 /* Style the internal toolbar element to use flexbox */
@@ -1272,14 +1256,8 @@ have to be updated for changes to the rules above, or to support more deeply nes
 }
 
 
-.interactive-session .chat-editing-session .monaco-list-row .chat-collapsible-list-action-bar {
+.interactive-session .chat-editing-session .monaco-list-row .chat-collapsible-list-action-bar:not(.has-no-actions) {
 	padding-left: 5px;
-	display: none;
-}
-
-.interactive-session .chat-editing-session .monaco-list-row:hover .chat-collapsible-list-action-bar:not(.has-no-actions),
-.interactive-session .chat-editing-session .monaco-list-row.focused .chat-collapsible-list-action-bar:not(.has-no-actions),
-.interactive-session .chat-editing-session .monaco-list-row.selected .chat-collapsible-list-action-bar:not(.has-no-actions) {
 	display: inherit;
 }
 
@@ -2722,18 +2700,13 @@ have to be updated for changes to the rules above, or to support more deeply nes
 }
 
 .chat-artifacts-widget .chat-artifacts-list-actions {
-	display: none;
+	display: flex;
 	margin-left: auto;
 	flex-shrink: 0;
 }
 
 .chat-artifacts-widget .chat-artifacts-list-actions .monaco-action-bar .actions-container {
 	gap: 4px;
-}
-
-.chat-artifacts-widget .chat-artifacts-list-row:hover .chat-artifacts-list-actions,
-.chat-artifacts-widget .chat-artifacts-list-row.force-hover .chat-artifacts-list-actions {
-	display: flex;
 }
 
 .chat-artifacts-widget .chat-artifacts-list-actions .action-item .action-label {
@@ -2922,7 +2895,7 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	.chat-file-changes-chevron {
 		flex: none;
 		font-size: var(--vscode-codiconFontSize-compact);
-		opacity: 0;
+		opacity: 0.7;
 	}
 
 	.checkpoint-file-changes-summary-header:hover .chat-file-changes-chevron,
@@ -3272,7 +3245,7 @@ have to be updated for changes to the rules above, or to support more deeply nes
 /* Hover chevron indicator for collapsible parts */
 .chat-collapsible-hover-chevron {
 	font-size: 12px;
-	opacity: 0;
+	opacity: 0.7;
 	transform: rotate(0deg);
 	transform-origin: center;
 	transition:
@@ -3756,6 +3729,10 @@ have to be updated for changes to the rules above, or to support more deeply nes
 		opacity: 1 !important;
 	}
 
+	.interactive-item-container.interactive-request .request-hover:not(.hidden):not(.has-no-actions) {
+		opacity: 0.7 !important;
+	}
+
 	.interactive-item-container.interactive-request.confirmation-message {
 		align-items: flex-start;
 
@@ -3815,13 +3792,8 @@ have to be updated for changes to the rules above, or to support more deeply nes
 		transition: opacity 0.1s ease-in-out;
 	}
 
-	.interactive-item-container.interactive-request:not(.group-hovered) .chat-request-timestamp {
-		opacity: 0;
-		transition: opacity 0.1s ease-in-out;
-	}
-
-	.interactive-item-container.interactive-request:not(.group-hovered) .chat-request-timestamp:focus {
-		opacity: 0.7;
+	.interactive-item-container.interactive-request.group-hovered .chat-request-timestamp {
+		opacity: 1;
 		transition: opacity 0.1s ease-in-out;
 	}
 
@@ -3876,8 +3848,8 @@ have to be updated for changes to the rules above, or to support more deeply nes
 
 	.interactive-item-container.interactive-request .value .chat-request-file-attachments .chat-attached-context-attachment .chat-attached-context-download-button {
 		display: flex;
-		visibility: hidden;
-		opacity: 0;
+		visibility: visible;
+		opacity: 0.7;
 		position: absolute;
 		left: -22px;
 		top: 50%;
@@ -3898,7 +3870,6 @@ have to be updated for changes to the rules above, or to support more deeply nes
 
 	.interactive-item-container.interactive-request .value .chat-request-file-attachments .chat-attached-context-attachment:hover .chat-attached-context-download-button,
 	.interactive-item-container.interactive-request .value .chat-request-file-attachments .chat-attached-context-attachment:focus-within .chat-attached-context-download-button {
-		visibility: visible;
 		opacity: 1;
 	}
 
@@ -3954,8 +3925,8 @@ have to be updated for changes to the rules above, or to support more deeply nes
 
 	.interactive-item-container.interactive-request .value .chat-request-attachment-cards .chat-attached-context-attachment.image-attachment .chat-attached-context-download-button {
 		display: flex !important;
-		visibility: hidden;
-		opacity: 0;
+		visibility: visible;
+		opacity: 0.7;
 		position: absolute;
 		right: 6px;
 		top: 6px;
@@ -3982,7 +3953,6 @@ have to be updated for changes to the rules above, or to support more deeply nes
 
 	.interactive-item-container.interactive-request .value .chat-request-attachment-cards .chat-attached-context-attachment.image-attachment:hover .chat-attached-context-download-button,
 	.interactive-item-container.interactive-request .value .chat-request-attachment-cards .chat-attached-context-attachment.image-attachment:focus-within .chat-attached-context-download-button {
-		visibility: visible;
 		opacity: 1;
 	}
 
@@ -4228,7 +4198,7 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	}
 
 	.checkpoint-container {
-		opacity: 0;
+		opacity: 0.7;
 		transition: opacity 0.1s ease-in-out;
 	}
 
@@ -4490,7 +4460,7 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	align-items: center;
 	justify-content: center;
 	cursor: grab;
-	opacity: 0;
+	opacity: 0.7;
 	transition: opacity 0.15s;
 	color: var(--vscode-descriptionForeground);
 	margin-top: -4px;

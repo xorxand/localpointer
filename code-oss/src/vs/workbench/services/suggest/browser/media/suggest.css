@@ -321,7 +321,13 @@
 	right: 10px;
 	width: 18px;
 	height: 18px;
-	visibility: hidden;
+	visibility: visible;
+	opacity: 0.6;
+}
+
+.workbench-suggest-widget .monaco-list .monaco-list-row:hover > .contents > .main > .right > .readMore,
+.workbench-suggest-widget .monaco-list .monaco-list-row.focused > .contents > .main > .right > .readMore {
+	opacity: 1;
 }
 
 .workbench-suggest-widget .suggest-details {

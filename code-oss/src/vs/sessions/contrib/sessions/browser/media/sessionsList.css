@@ -60,7 +60,8 @@
 	.monaco-list-row .session-title-toolbar {
 		position: relative;
 		height: 16px;
-		display: none;
+		display: block;
+		opacity: 0.6;
 
 		.monaco-toolbar {
 			position: relative;
@@ -86,7 +87,7 @@
 	.monaco-list-row:hover,
 	.monaco-list-row.focused:not(.selected) {
 		.session-title-toolbar {
-			display: block;
+			opacity: 1;
 		}
 
 		.session-title {
@@ -508,7 +509,8 @@
 	.session-section-toolbar {
 		flex-shrink: 0;
 		margin-left: 4px;
-		display: none;
+		display: block;
+		opacity: 0.6;
 	}
 
 	.session-section-toolbar .monaco-action-bar .action-label {
@@ -525,17 +527,22 @@
 		border-radius: var(--vscode-cornerRadius-small);
 		justify-content: center;
 	}
+
+	.session-section-chevron.collapsible {
+		display: flex;
+		align-items: center;
+		opacity: 0.6;
+	}
 }
 
 .monaco-list-row:hover .session-section .session-section-toolbar,
 .monaco-list-row.focused .session-section .session-section-toolbar {
-	display: block;
+	opacity: 1;
 }
 
 .monaco-list-row:hover .session-section .session-section-chevron.collapsible,
 .monaco-list-row.focused .session-section .session-section-chevron.collapsible {
-	display: flex;
-	align-items: center;
+	opacity: 1;
 }
 
 .monaco-list-row .session-section .session-section-chevron.collapsible:hover {

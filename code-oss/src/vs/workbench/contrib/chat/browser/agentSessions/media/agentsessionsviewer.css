@@ -106,7 +106,8 @@
 		/* for the absolute positioning of the toolbar below */
 		position: relative;
 		height: 16px;
-		display: none;
+		display: block;
+		opacity: 0.6;
 
 		.monaco-toolbar {
 			/* this is required because the overal height (including the padding needed for hover feedback) would push down the title otherwise */
@@ -125,7 +126,7 @@
 		}
 
 		.agent-session-title-toolbar {
-			display: block;
+			opacity: 1;
 		}
 
 		.agent-session-title {
@@ -394,13 +395,15 @@
 		.agent-session-section-toolbar {
 			/* for the absolute positioning of the toolbar below */
 			position: relative;
+			width: 22px;
 
 			.monaco-toolbar {
 				/* this is required because the overal height (including the padding needed for hover feedback) would push down the label otherwise */
 				position: absolute;
 				right: 0;
 				top: 0;
-				display: none;
+				display: block;
+				opacity: 0.6;
 			}
 		}
 	}
@@ -414,7 +417,7 @@
 		width: 22px;
 
 		.monaco-toolbar {
-			display: block;
+			opacity: 1;
 		}
 	}
 

@@ -47,14 +47,15 @@
 }
 
 .profiles-editor .monaco-list-row .profile-tree-item-actions-container {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 	align-items: center;
 }
 
 .profiles-editor .monaco-list-row.focused .profile-tree-item-actions-container,
 .profiles-editor .monaco-list-row.selected .profile-tree-item-actions-container,
 .profiles-editor .monaco-list-row:hover .profile-tree-item-actions-container {
-	display: flex;
+	opacity: 1;
 }
 
 .profiles-editor .sidebar-container .profiles-list {
@@ -296,7 +297,8 @@
 }
 
 .profiles-editor .contents-container .profile-tree-item-container .profile-resource-actions-container {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 	justify-self: end;
 	padding-right: 10px;
 }
@@ -304,7 +306,7 @@
 .profiles-editor .contents-container .profile-content-tree .monaco-list-row.selected .profile-resource-actions-container,
 .profiles-editor .contents-container .profile-content-tree .monaco-list-row.focused .profile-resource-actions-container,
 .profiles-editor .contents-container .profile-content-tree .monaco-list-row:hover .profile-resource-actions-container {
-	display: flex;
+	opacity: 1;
 }
 
 .profiles-editor .contents-container .profile-body .profile-row-container.profile-button-container {
@@ -336,7 +338,8 @@
 }
 
 .profiles-editor .profile-associations-table .monaco-list-row .monaco-table-tr .monaco-table-td .profile-workspaces-actions-container {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 	justify-content: flex-end;
 	padding-right: 5px;
 }
@@ -344,7 +347,7 @@
 .profiles-editor .profile-associations-table .monaco-list-row.selected .monaco-table-tr .monaco-table-td .profile-workspaces-actions-container,
 .profiles-editor .profile-associations-table .monaco-list-row.focused .monaco-table-tr .monaco-table-td .profile-workspaces-actions-container,
 .profiles-editor .profile-associations-table .monaco-list-row:hover .monaco-table-tr .monaco-table-td .profile-workspaces-actions-container {
-	display: flex;
+	opacity: 1;
 }
 
 .profiles-editor .profile-associations-table .monaco-table-tr .monaco-table-td .host,

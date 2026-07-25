@@ -62,7 +62,7 @@
 
 .update-tooltip .copy-version-button {
 	cursor: pointer;
-	opacity: 0;
+	opacity: 0.6;
 	color: var(--vscode-descriptionForeground);
 	transition: opacity 0.1s;
 	margin-top: -2px;

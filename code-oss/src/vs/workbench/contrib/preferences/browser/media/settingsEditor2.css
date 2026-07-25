@@ -274,7 +274,7 @@
 }
 
 .settings-editor > .settings-body .settings-tree-container .setting-toolbar-container > .monaco-toolbar .codicon {
-	opacity: 0;
+	opacity: 0.6;
 	display: flex;
 	align-items: center;
 	justify-content: center;

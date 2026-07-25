@@ -104,7 +104,8 @@
 }
 
 .settings-editor > .settings-body .settings-tree-container .setting-item.setting-item-list .setting-list-row .monaco-action-bar {
-	display: none;
+	display: block;
+	opacity: 0.6;
 	position: absolute;
 	right: 0px;
 	top: 0px;
@@ -160,7 +161,7 @@
 
 .settings-editor > .settings-body .settings-tree-container .setting-item.setting-item-list .setting-list-row:hover .monaco-action-bar,
 .settings-editor > .settings-body .settings-tree-container .setting-item.setting-item-list .setting-list-row.selected .monaco-action-bar {
-	display: block;
+	opacity: 1;
 }
 
 .settings-editor > .settings-body .settings-tree-container .setting-item.setting-item-list .setting-list-row .monaco-action-bar .action-label {

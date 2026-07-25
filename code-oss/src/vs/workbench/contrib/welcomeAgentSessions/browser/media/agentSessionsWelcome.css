@@ -482,11 +482,12 @@
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	flex-shrink: 0;
-	opacity: 0;
+	opacity: 0.6;
 	transition: opacity 0.1s;
 }
 
-.agentSessionsWelcome-tosCard:hover .agentSessionsWelcome-tosCard-dismiss {
+.agentSessionsWelcome-tosCard:hover .agentSessionsWelcome-tosCard-dismiss,
+.agentSessionsWelcome-tosCard:focus-within .agentSessionsWelcome-tosCard-dismiss {
 	opacity: 1;
 }
 

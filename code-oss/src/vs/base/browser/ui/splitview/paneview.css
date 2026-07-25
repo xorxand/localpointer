@@ -60,7 +60,8 @@
 
 /* TODO: actions should be part of the pane, but they aren't yet */
 .monaco-pane-view .pane > .pane-header > .actions {
-	display: none;
+	display: initial;
+	opacity: 0.6;
 	margin-left: auto;
 	margin-right: 8px;
 }
@@ -78,7 +79,7 @@
 .monaco-pane-view .pane:focus-within > .pane-header.expanded > .actions,
 .monaco-pane-view .pane > .pane-header.actions-always-visible.expanded > .actions,
 .monaco-pane-view .pane > .pane-header.focused.expanded > .actions {
-	display: initial;
+	opacity: 1;
 }
 
 .monaco-pane-view .pane > .pane-header .monaco-action-bar .action-item.select-container {

@@ -9,8 +9,8 @@
 }
 
 .interactive-result-code-block .interactive-result-code-block-toolbar {
-	opacity: 0;
-	pointer-events: none;
+	opacity: 1;
+	pointer-events: auto;
 }
 
 .interactive-result-code-block .interactive-result-code-block-toolbar > .monaco-action-bar,
@@ -44,13 +44,6 @@
 
 .interactive-result-code-block .monaco-toolbar .action-item .codicon {
 	margin: 1px;
-}
-
-.interactive-result-code-block:hover .interactive-result-code-block-toolbar,
-.interactive-result-code-block .interactive-result-code-block-toolbar:focus-within,
-.interactive-result-code-block.focused .interactive-result-code-block-toolbar {
-	opacity: 1;
-	pointer-events: auto;
 }
 
 .interactive-result-code-block .interactive-result-code-block-toolbar.force-visibility {

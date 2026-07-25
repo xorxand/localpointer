@@ -244,15 +244,20 @@
 }
 
 /* Action bar in list rows */
-.changes-file-list .monaco-list-row .chat-collapsible-list-action-bar {
+.changes-file-list .monaco-list-row .chat-collapsible-list-action-bar:not(.has-no-actions) {
 	padding-left: 6px;
-	display: none;
+	display: inherit;
+	opacity: 0.6;
 }
 
 .changes-file-list .monaco-list-row:hover .chat-collapsible-list-action-bar:not(.has-no-actions),
 .changes-file-list .monaco-list-row.focused .chat-collapsible-list-action-bar:not(.has-no-actions),
 .changes-file-list .monaco-list-row.selected .chat-collapsible-list-action-bar:not(.has-no-actions) {
-	display: inherit;
+	opacity: 1;
+}
+
+.changes-file-list .monaco-list-row .chat-collapsible-list-action-bar.has-no-actions {
+	display: none;
 }
 
 /* Hide diff stats on hover/focus/select when toolbar has actions */

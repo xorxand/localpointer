@@ -302,7 +302,8 @@
 
 .search-view .monaco-list .monaco-list-row .monaco-action-bar {
 	line-height: 1em;
-	display: none;
+	display: inline-block;
+	opacity: 0.6;
 	padding: 0 0.8em 0 0.4em;
 }
 
@@ -313,7 +314,7 @@
 .search-view .monaco-list .monaco-list-row:hover:not(.highlighted) .monaco-action-bar,
 .search-view .monaco-list .monaco-list-row.selected .monaco-action-bar,
 .search-view .monaco-list .monaco-list-row.focused .monaco-action-bar {
-	display: inline-block;
+	opacity: 1;
 }
 
 .search-view .monaco-list .monaco-list-row .monaco-action-bar .action-item {

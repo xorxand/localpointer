@@ -3942,7 +3942,8 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 	}
 
 	private hoverHidden(requestHover: HTMLElement) {
-		requestHover.style.opacity = '0';
+		// Keep actionable request controls visible at rest (dimmed); hover only increases emphasis.
+		requestHover.style.opacity = '0.7';
 	}
 
 }

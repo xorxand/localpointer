@@ -32,16 +32,17 @@
 	flex: 1;
 }
 
-/* Action bar: hidden by default, shown on row hover */
+/* Action bar: always visible at rest, emphasized on row hover */
 .agent-feedback-hover-action-bar {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 	flex-shrink: 0;
 	margin-left: auto;
 	padding-right: 4px;
 }
 
 .agent-feedback-hover-tree .monaco-list-row:hover .agent-feedback-hover-action-bar {
-	display: flex;
+	opacity: 1;
 }
 
 /* Attachment widget pill styling */

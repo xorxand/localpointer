@@ -342,7 +342,7 @@
 	/* The marks stay quiet (invisible) at rest and during gentle scrolling so the transcript reads
 	 * calm — only a deliberate gesture surfaces them: hovering the lane (`:hover`), the fisheye bloom
 	 * on a hard scroll (`.engaged`), or keyboard focus inside the rail (`:focus-within`). */
-	opacity: 0;
+	opacity: 0.6;
 	transition: opacity 200ms ease;
 	z-index: 2;
 }

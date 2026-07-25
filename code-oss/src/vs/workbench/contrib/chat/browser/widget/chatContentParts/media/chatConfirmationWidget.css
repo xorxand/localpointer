@@ -453,13 +453,7 @@
 		margin: 0 6px;
 	}
 
-	.chat-collapsible-list-action-bar {
-		display: none;
-	}
-
-	.monaco-list-row:hover .chat-collapsible-list-action-bar:not(.has-no-actions),
-	.monaco-list-row.focused .chat-collapsible-list-action-bar:not(.has-no-actions),
-	.monaco-list-row.selected .chat-collapsible-list-action-bar:not(.has-no-actions) {
+	.chat-collapsible-list-action-bar:not(.has-no-actions) {
 		display: inherit;
 	}
 }

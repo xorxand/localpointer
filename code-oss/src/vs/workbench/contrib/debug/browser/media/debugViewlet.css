@@ -191,13 +191,14 @@
 }
 
 .debug-pane .monaco-list-row .monaco-action-bar {
-	display: none;
+	display: initial;
+	opacity: 0.6;
 	flex-shrink: 0;
 }
 
 .debug-pane .monaco-list-row:hover .monaco-action-bar,
 .debug-pane .monaco-list-row.focused .monaco-action-bar {
-	display: initial;
+	opacity: 1;
 }
 
 .debug-pane .monaco-list-row .monaco-action-bar .action-label {

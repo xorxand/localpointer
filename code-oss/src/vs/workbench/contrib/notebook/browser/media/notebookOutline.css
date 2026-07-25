@@ -45,15 +45,16 @@
 }
 
 .monaco-list-row .notebook-outline-element .action-menu {
-	display: none;
+	display: flex;
+	opacity: 0.6;
 }
 
 .monaco-list-row.focused.selected .notebook-outline-element .action-menu {
-	display: flex;
+	opacity: 1;
 }
 
 .monaco-list-row:hover .notebook-outline-element .action-menu {
-	display: flex;
+	opacity: 1;
 }
 
 .monaco-list-row .notebook-outline-element.notebook-outline-toolbar-dropdown-active .action-menu {

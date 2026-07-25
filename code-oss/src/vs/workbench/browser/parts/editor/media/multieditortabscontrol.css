@@ -491,7 +491,7 @@
 }
 
 .monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab > .tab-actions .action-label {
-	opacity: 0;
+	opacity: 0.5;
 }
 
 /* Tab Actions: Off */

@@ -89,13 +89,14 @@
 }
 
 .ports-view .monaco-list .monaco-list-row .ports-view-actionbar-cell .actions {
-	display: none;
+	display: block;
+	opacity: 0.6;
 }
 
 .ports-view .monaco-list .monaco-list-row:hover .ports-view-actionbar-cell .actions,
 .ports-view .monaco-list .monaco-list-row.selected .ports-view-actionbar-cell .actions,
 .ports-view .monaco-list .monaco-list-row.focused .ports-view-actionbar-cell .actions {
-	display: block;
+	opacity: 1;
 }
 
 .ports-view .monaco-list .ports-view-actionbar-cell .actions .action-label {

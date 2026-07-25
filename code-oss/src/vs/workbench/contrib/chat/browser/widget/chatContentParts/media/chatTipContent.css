@@ -4,8 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 .chat-getting-started-tip-container .chat-tip-widget .chat-tip-toolbar {
-	opacity: 0;
-	pointer-events: none;
+	opacity: 0.6;
 }
 
 .chat-getting-started-tip-container .chat-tip-widget .chat-tip-toolbar > .monaco-toolbar {
@@ -23,7 +22,6 @@
 .chat-getting-started-tip-container .chat-tip-widget:hover .chat-tip-toolbar,
 .chat-getting-started-tip-container .chat-tip-widget:focus-within .chat-tip-toolbar {
 	opacity: 1;
-	pointer-events: auto;
 }
 
 .chat-getting-started-tip-container .chat-tip-widget .chat-tip-toolbar .action-item {

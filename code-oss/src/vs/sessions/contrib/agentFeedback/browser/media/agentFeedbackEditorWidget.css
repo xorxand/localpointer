@@ -183,15 +183,13 @@
 .agent-feedback-widget-item-actions {
 	margin-left: auto;
 	flex: 0 0 auto;
-	opacity: 0;
-	visibility: hidden;
-	pointer-events: none;
+	opacity: 0.6;
+	visibility: visible;
+	pointer-events: auto;
 }
 
 .agent-feedback-widget-item:hover .agent-feedback-widget-item-actions {
 	opacity: 1;
-	visibility: visible;
-	pointer-events: auto;
 }
 
 .agent-feedback-widget-item-type {

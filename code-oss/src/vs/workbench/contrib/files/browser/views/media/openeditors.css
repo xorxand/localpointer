@@ -24,7 +24,7 @@
 .open-editors .monaco-list .monaco-list-row.focused > .monaco-action-bar,
 .open-editors .monaco-list .monaco-list-row.dirty > .monaco-action-bar,
 .open-editors .monaco-list .monaco-list-row.sticky > .monaco-action-bar {
-	visibility: visible;
+	opacity: 1;
 }
 
 .open-editors .monaco-list .monaco-list-row > .monaco-action-bar .action-label {
@@ -68,7 +68,7 @@
 }
 
 .open-editors .monaco-list .monaco-list-row > .monaco-action-bar {
-	visibility: hidden;
+	opacity: 0.6;
 	display: flex;
 	align-items: center;
 }

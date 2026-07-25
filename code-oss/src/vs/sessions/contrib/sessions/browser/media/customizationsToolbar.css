@@ -99,15 +99,14 @@
 	width: 22px;
 	height: 22px;
 	border-radius: var(--vscode-cornerRadius-small);
-	visibility: hidden;
-	opacity: 0;
+	visibility: visible;
+	opacity: 0.6;
 }
 
 .ai-customization-toolbar .ai-customization-header:hover .ai-customization-chevron,
 .ai-customization-toolbar .ai-customization-header:focus-visible .ai-customization-chevron,
 .ai-customization-toolbar .ai-customization-header.collapsed .ai-customization-chevron {
-	visibility: visible;
-	opacity: 0.7;
+	opacity: 1;
 }
 
 .ai-customization-toolbar .ai-customization-chevron:hover {

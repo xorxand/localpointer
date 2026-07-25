@@ -163,7 +163,8 @@
 }
 
 .comments-panel .comments-panel-container .actions {
-	display: none;
+	display: block;
+	opacity: 0.6;
 }
 
 .comments-panel .comments-panel-container .actions .action-label {
@@ -173,5 +174,5 @@
 .comments-panel .monaco-list .monaco-list-row:hover .comment-metadata-container .actions,
 .comments-panel .monaco-list .monaco-list-row.selected .comment-metadata-container .actions,
 .comments-panel .monaco-list .monaco-list-row.focused .comment-metadata-container .actions {
-	display: block;
+	opacity: 1;
 }

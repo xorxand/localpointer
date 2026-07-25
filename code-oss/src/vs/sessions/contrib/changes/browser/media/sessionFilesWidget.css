@@ -18,6 +18,7 @@
 	display: flex;
 	align-items: center;
 	padding: 4px;
+	padding-right: 32px;
 	margin-top: 6px;
 	border-radius: var(--vscode-cornerRadius-medium);
 	min-height: 20px;
@@ -55,7 +56,7 @@
 	outline: none !important;
 }
 
-/* Chevron — right-aligned, visible on hover, keyboard focus, or when collapsed */
+/* Chevron — right-aligned, always visible (dimmed at rest) */
 .session-files-widget-header .group-chevron {
 	position: absolute;
 	right: 4px;
@@ -68,15 +69,14 @@
 	align-items: center;
 	justify-content: center;
 	font-size: var(--vscode-codiconFontSize-compact, 12px);
-	visibility: hidden;
-	opacity: 0;
+	visibility: visible;
+	opacity: 0.6;
 }
 
 .session-files-widget-header:hover .group-chevron,
 .session-files-widget-header:focus-visible .group-chevron,
 .session-files-widget-header.collapsed .group-chevron {
-	visibility: visible;
-	opacity: 0.7;
+	opacity: 1;
 }
 
 .session-files-widget-header .group-chevron:hover {
@@ -158,14 +158,19 @@
 	white-space: nowrap;
 }
 
-/* Inline action bar (Open File), shown on hover/focus/select — mirrors the changes view */
-.session-files-widget .monaco-list-row .chat-collapsible-list-action-bar {
+/* Inline action bar (Open File), always visible (dimmed at rest) */
+.session-files-widget .monaco-list-row .chat-collapsible-list-action-bar:not(.has-no-actions) {
 	padding-left: 6px;
-	display: none;
+	display: inherit;
+	opacity: 0.6;
 }
 
 .session-files-widget .monaco-list-row:hover .chat-collapsible-list-action-bar:not(.has-no-actions),
 .session-files-widget .monaco-list-row.focused .chat-collapsible-list-action-bar:not(.has-no-actions),
 .session-files-widget .monaco-list-row.selected .chat-collapsible-list-action-bar:not(.has-no-actions) {
-	display: inherit;
+	opacity: 1;
+}
+
+.session-files-widget .monaco-list-row .chat-collapsible-list-action-bar.has-no-actions {
+	display: none;
 }
