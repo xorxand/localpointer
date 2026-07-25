@@ -137,14 +137,18 @@ export class DefaultAccountService extends Disposable implements IDefaultAccount
 	private readonly _onDidChangeCopilotTokenInfo = this._register(new Emitter<ICopilotTokenInfo | null>());
 	readonly onDidChangeCopilotTokenInfo = this._onDidChangeCopilotTokenInfo.event;
 
-	private readonly defaultAccountConfig: IDefaultAccountConfig;
+	private readonly defaultAccountConfig: IDefaultAccountConfig | undefined;
 	private defaultAccountProvider: IDefaultAccountProvider | null = null;
 
 	constructor(
 		@IProductService productService: IProductService,
 	) {
 		super();
-		this.defaultAccountConfig = toDefaultAccountConfig(productService.defaultChatAgent);
+		// LocalPointer: skip cloud account wiring unless a real auth provider is configured.
+		const agent = productService.defaultChatAgent;
+		this.defaultAccountConfig = agent && agent.provider?.default?.id && agent.provider.default.id !== 'none'
+			? toDefaultAccountConfig(agent)
+			: undefined;
 	}
 
 	async getDefaultAccount(): Promise<IDefaultAccount | null> {
@@ -155,6 +159,9 @@ export class DefaultAccountService extends Disposable implements IDefaultAccount
 	getDefaultAccountAuthenticationProvider(): IDefaultAccountAuthenticationProvider {
 		if (this.defaultAccountProvider) {
 			return this.defaultAccountProvider.getDefaultAccountAuthenticationProvider();
+		}
+		if (!this.defaultAccountConfig) {
+			return { id: 'none', name: 'None', enterprise: false };
 		}
 		return {
 			...this.defaultAccountConfig.authenticationProvider.default,
@@ -1175,7 +1182,12 @@ class DefaultAccountProviderContribution extends Disposable implements IWorkbenc
 		@IDefaultAccountService defaultAccountService: IDefaultAccountService,
 	) {
 		super();
-		const defaultAccountProvider = this._register(instantiationService.createInstance(DefaultAccountProvider, toDefaultAccountConfig(productService.defaultChatAgent)));
+		// LocalPointer: do not register cloud account / entitlement providers for local-only agent.
+		const agent = productService.defaultChatAgent;
+		if (!agent || !agent.provider?.default?.id || agent.provider.default.id === 'none') {
+			return;
+		}
+		const defaultAccountProvider = this._register(instantiationService.createInstance(DefaultAccountProvider, toDefaultAccountConfig(agent)));
 		defaultAccountService.setDefaultAccountProvider(defaultAccountProvider);
 	}
 }

@@ -446,13 +446,20 @@ export class ChatAgentService extends Disposable implements IChatAgentService {
 	}
 
 	getDefaultAgent(location: ChatAgentLocation, mode: ChatModeKind = ChatModeKind.Ask): IChatAgent | undefined {
-		return this._preferExtensionAgent(this.getActivatedAgents().filter(a => {
+		const activated = this.getActivatedAgents();
+		const matched = this._preferExtensionAgent(activated.filter(a => {
 			if (mode && !a.modes.includes(mode)) {
 				return false;
 			}
 
 			return !!a.isDefault && a.locations.includes(location);
 		}));
+		if (matched) {
+			return matched;
+		}
+		// LocalPointer: if no agent advertises this mode (e.g. Agent UI with Ask-only contrib),
+		// still allow send via any default agent for the location rather than silently rejecting.
+		return this._preferExtensionAgent(activated.filter(a => !!a.isDefault && a.locations.includes(location)));
 	}
 
 	public get hasToolsAgent(): boolean {

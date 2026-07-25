@@ -184,6 +184,12 @@ export interface IChatSetupRequirement {
  * intentionally satisfy the entitlement-based checks so those flows keep working.
  */
 export function chatRequiresSetup(context: IChatSetupRequirement): boolean {
+	// LocalPointer: never gate chat / model picker on GitHub Copilot setup.
+	const providerId = product.defaultChatAgent?.provider?.default?.id;
+	if (!providerId || providerId === 'none') {
+		return false;
+	}
+
 	return (
 		(!context.completed && !context.hasByokModels) ||			// Setup not completed (unless BYOK models are available)
 		context.disabled ||											// Extension disabled: run setup to enable
@@ -456,6 +462,16 @@ export class ChatEntitlementService extends Disposable implements IChatEntitleme
 
 		if (!productService.defaultChatAgent) {
 			return; // we need a default chat agent configured going forward from here
+		}
+
+		// LocalPointer: local-only agent has no cloud entitlements — treat setup as done
+		// and mark local models as available so the model picker never asks for Copilot.
+		if (!productService.defaultChatAgent.provider?.default?.id || productService.defaultChatAgent.provider.default.id === 'none') {
+			ChatEntitlementContextKeys.Setup.completed.bindTo(this.contextKeyService).set(true);
+			ChatEntitlementContextKeys.Setup.installed.bindTo(this.contextKeyService).set(true);
+			ChatEntitlementContextKeys.clientByokEnabled.bindTo(this.contextKeyService).set(true);
+			ChatEntitlementContextKeys.hasByokModels.bindTo(this.contextKeyService).set(true);
+			return;
 		}
 
 		const context = this.context = new Lazy(() => this._register(instantiationService.createInstance(ChatEntitlementContext)));

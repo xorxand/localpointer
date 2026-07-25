@@ -31,7 +31,7 @@ import { ChatContextKeys } from '../../common/actions/chatContextKeys.js';
 import { getModeNameForTelemetry, buildCustomAgentHandoffsInfo, getHandoffId, IChatMode, IChatModeService, IChatModes } from '../../common/chatModes.js';
 import { chatVariableLeader } from '../../common/requestParser/chatParserTypes.js';
 import { ChatStopCancellationNoopClassification, ChatStopCancellationNoopEvent, ChatStopCancellationNoopEventName, IChatService } from '../../common/chatService/chatService.js';
-import { ChatAgentLocation, ChatConfiguration, ChatModeKind } from '../../common/constants.js';
+import { ChatAgentLocation, ChatConfiguration, ChatModeKind, ChatPermissionLevel } from '../../common/constants.js';
 import { ILanguageModelChatMetadata } from '../../common/languageModels.js';
 import { ILanguageModelToolsService } from '../../common/tools/languageModelToolsService.js';
 import { isInClaudeAgentsFolder } from '../../common/promptSyntax/config/promptFileLocations.js';
@@ -467,11 +467,15 @@ export class OpenPermissionPickerAction extends Action2 {
 	constructor() {
 		super({
 			id: OpenPermissionPickerAction.ID,
-			title: localize2('interactive.openPermissionPicker.label', "Open Permission Picker"),
-			tooltip: localize('setPermissionLevel', "Set Permissions"),
+			title: localize2('interactive.runEverything.label', "Run everything"),
+			tooltip: localize('runEverything.tooltip', "When on, run all tool calls without asking"),
 			category: CHAT_CATEGORY,
 			f1: false,
 			precondition: ChatContextKeys.enabled,
+			toggled: {
+				condition: ChatContextKeys.chatPermissionLevel.isEqualTo(ChatPermissionLevel.AutoApprove),
+				tooltip: localize('runEverything.on.tooltip', "Tools run without asking. Click to ask each time."),
+			},
 			menu: {
 				id: MenuId.ChatInputSecondary,
 				order: 1,
@@ -492,12 +496,26 @@ export class OpenPermissionPickerAction extends Action2 {
 		});
 	}
 
-	override async run(accessor: ServicesAccessor): Promise<void> {
+	override async run(accessor: ServicesAccessor, ...args: unknown[]): Promise<void> {
 		const widgetService = accessor.get(IChatWidgetService);
 		const widget = widgetService.lastFocusedWidget;
-		if (widget) {
-			widget.input.openPermissionPicker();
+		if (!widget) {
+			return;
 		}
+		// Optional arg: force on/off (used by LocalPointer when the user picks "Run all" on a tool prompt).
+		const force = args[0];
+		const current = widget.input.currentPermissionLevelObs.get();
+		let next: ChatPermissionLevel;
+		if (force === true || force === 'autoApprove' || force === ChatPermissionLevel.AutoApprove) {
+			next = ChatPermissionLevel.AutoApprove;
+		} else if (force === false || force === 'default' || force === ChatPermissionLevel.Default) {
+			next = ChatPermissionLevel.Default;
+		} else {
+			next = current === ChatPermissionLevel.AutoApprove
+				? ChatPermissionLevel.Default
+				: ChatPermissionLevel.AutoApprove;
+		}
+		widget.input.setPermissionLevel(next);
 	}
 }
 

@@ -148,10 +148,11 @@ import { ChatGoalBannerWidget } from './chatGoalBannerWidget.js';
 import { ChatInputNotificationWidget } from './chatInputNotificationWidget.js';
 import { IChatInputPickerOptions } from './chatInputPickerActionItem.js';
 import { ChatSelectedTools } from './chatSelectedTools.js';
+import { CheckboxActionViewItem } from '../../../../../../base/browser/ui/toggle/toggle.js';
+import { defaultCheckboxStyles } from '../../../../../../platform/theme/browser/defaultStyles.js';
 import { DelegationSessionPickerActionItem } from './delegationSessionPickerActionItem.js';
 import { ModelPickerActionItem, IModelPickerDelegate, IModelPickerPresentationOptions } from './modelPicker/modelPickerActionItem.js';
 import { IModePickerDelegate, isModeConsideredBuiltIn, ModePickerActionItem } from './modePickerActionItem.js';
-import { IPermissionPickerDelegate, PermissionPickerActionItem } from './permissionPickerActionItem.js';
 import { SessionTypePickerActionItem } from './sessionTargetPickerActionItem.js';
 import { WorkspacePickerActionItem } from './workspacePickerActionItem.js';
 import { ChatContextUsageWidget } from '../../widgetHosts/viewPane/chatContextUsageWidget.js';
@@ -512,8 +513,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	private chatSessionHasTargetedModels: IContextKey<boolean>;
 	private modelWidget: ModelPickerActionItem | undefined;
 	private modeWidget: ModePickerActionItem | undefined;
-	private permissionWidget: PermissionPickerActionItem | undefined;
-	private readonly permissionWidgetDisposeListener = this._register(new MutableDisposable<IDisposable>());
 	private sessionTargetWidget: SessionTypePickerActionItem | undefined;
 	private delegationWidget: DelegationSessionPickerActionItem | undefined;
 	private readonly chatSessionPickerWidgets = this._register(new DisposableMap<string, ChatSessionPickerActionItem>());
@@ -1268,14 +1267,13 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 	}
 
 	public openPermissionPicker(): void {
-		this.permissionWidget?.show();
+		// LocalPointer uses a toggled "Run everything" action instead of a dropdown picker.
 	}
 
 	public setPermissionLevel(level: ChatPermissionLevel): void {
 		level = this.getPermittedPermissionLevel(level);
 		this._currentPermissionLevel.set(level, undefined);
 		this.permissionLevelKey.set(level);
-		this.permissionWidget?.refresh();
 		const sessionResource = this.getCurrentSessionResource();
 		if (sessionResource) {
 			this.chatSessionsService.setSessionOption(sessionResource, PERMISSION_LEVEL_OPTION_ID, level);
@@ -1588,7 +1586,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 				if (this._currentPermissionLevel.get() !== targetLevel) {
 					this._currentPermissionLevel.set(targetLevel, undefined);
 					this.permissionLevelKey.set(targetLevel);
-					this.permissionWidget?.refresh();
 				}
 			}
 
@@ -2330,7 +2327,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		this.chatSessionHasTargetedModels.set(!!requiresCustomModels);
 
 		const visibleOptionGroups = this.getVisibleOptionGroups(sessionResource);
-		this.permissionWidget?.refresh();
 		if (!visibleOptionGroups.length) {
 			this.chatSessionHasOptions.set(false);
 			this.chatSessionOptionsValid.set(true);
@@ -2424,8 +2420,7 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		}
 
 		// Filter to visible groups (has items AND passes `when` clause AND session has option configured).
-		// Permissions-kind groups are not rendered as standalone pickers; their items are surfaced
-		// inside the chat permission picker instead (see `getActiveExtensionPermissionGroup`).
+		// Permissions-kind groups are handled by the LocalPointer "Run everything" toggle, not standalone pickers.
 		const visibleGroups = new Map<string, IChatSessionProviderOptionGroup>();
 		for (const optionGroup of allOptionGroups) {
 			if (optionGroup.kind === 'permissions') {
@@ -2444,24 +2439,6 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		}
 
 		return Array.from(visibleGroups.values());
-	}
-
-	/**
-	 * Returns the permissions-kind option group contributed by the active session provider, if any.
-	 * Items from this group are surfaced inside the chat permission picker, replacing the
-	 * built-in `ChatPermissionLevel` items. Honors the same visibility predicates as
-	 * {@link getVisibleOptionGroups} so that `when` clauses are respected.
-	 *
-	 * If the provider declares more than one permissions-kind group (which the API forbids),
-	 * the first one wins.
-	 */
-	private getActiveExtensionPermissionGroup(sessionResource: URI | undefined): IChatSessionProviderOptionGroup | undefined {
-		const allOptionGroups = this.getAllOptionsGroups(sessionResource);
-		return allOptionGroups.find(g =>
-			g.kind === 'permissions'
-			&& g.items.length > 0
-			&& this.evaluateOptionGroupVisibility(g)
-		);
 	}
 
 	/**
@@ -3387,50 +3364,13 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 						return new HiddenActionViewItem(action);
 					}
 				} else if (action.id === OpenPermissionPickerAction.ID && action instanceof MenuItemAction) {
-					const delegate: IPermissionPickerDelegate = {
-						currentPermissionLevel: this._currentPermissionLevel,
-						setPermissionLevel: (level: ChatPermissionLevel) => {
-							this.setPermissionLevel(level);
-						},
-						getExtensionPermissions: () => {
-							const sessionResource = this.getCurrentSessionResource();
-							const group = this.getActiveExtensionPermissionGroup(sessionResource);
-							if (!group) {
-								return undefined;
-							}
-							const current = sessionResource ? this.chatSessionsService.getSessionOption(sessionResource, group.id) : undefined;
-							const defaultId = group.selected?.id ?? group.items.find(i => i.default)?.id;
-							const rawSelectedId = current === undefined
-								? defaultId
-								: typeof current === 'string' ? current : current.id;
-							const selectedId = rawSelectedId !== undefined && group.items.some(i => i.id === rawSelectedId)
-								? rawSelectedId
-								: defaultId;
-							const sessionType = sessionResource
-								? getChatSessionType(sessionResource)
-								: (this.options.sessionTypePickerDelegate?.getActiveSessionProvider?.() ?? '');
-							return { sessionType, groupId: group.id, items: group.items, selectedId };
-						},
-						setExtensionPermission: (groupId: string, item: IChatSessionProviderOptionItem) => {
-							this.updateOptionContextKey(groupId, item.id);
-							this.getOrCreateOptionEmitter(groupId).fire(item);
-							const sessionResource = this.getCurrentSessionResource();
-							if (sessionResource) {
-								this.chatSessionsService.setSessionOption(sessionResource, groupId, item);
-							}
-							this.permissionWidget?.refresh();
-						},
-						isSandboxToggleApplicable: () => this.getEffectiveSessionType(this.getCurrentSessionResource()) === SessionType.Local,
-					};
-					const widget = this.instantiationService.createInstance(PermissionPickerActionItem, action, delegate, secondaryPickerOptions);
-					this.permissionWidget = widget;
-					this.permissionWidgetDisposeListener.value = widget.onDidDispose(() => {
-						if (this.permissionWidget === widget) {
-							this.permissionWidget = undefined;
-						}
-						this.permissionWidgetDisposeListener.clear();
+					// LocalPointer: checkbox + label toggle, not a pressed toolbar button.
+					return new CheckboxActionViewItem(undefined, action, {
+						...options,
+						icon: true,
+						label: true,
+						checkboxStyles: defaultCheckboxStyles,
 					});
-					return widget;
 				} else if (agentHostPickerProperty && action instanceof MenuItemAction) {
 					if (this.options.isSessionsWindow) {
 						return new HiddenActionViewItem(action);

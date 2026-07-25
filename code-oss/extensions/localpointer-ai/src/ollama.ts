@@ -61,11 +61,12 @@ export class OllamaClient {
 		return (data.models ?? []).map(m => m.name || m.model).filter(Boolean);
 	}
 
-	async chat(model: string, messages: OllamaMessage[]): Promise<string> {
+	async chat(model: string, messages: OllamaMessage[], signal?: AbortSignal): Promise<string> {
 		const resp = await fetch(`${this.baseUrl}/api/chat`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ model, messages, stream: false }),
+			signal,
 		});
 		if (!resp.ok) {
 			const body = await resp.text();

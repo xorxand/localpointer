@@ -29,7 +29,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const chatView = new ChatViewProvider(context, daemonManager, ollama);
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatView),
+		vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatView, {
+			webviewOptions: { retainContextWhenHidden: true },
+		}),
 	);
 
 	const chatParticipant = new ChatParticipantService(daemonManager, ollama);
@@ -48,7 +50,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const agentEdit = new AgentEditService(daemonManager, ollama);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('localpointer.openChat', () => chatView.focus()),
+		vscode.commands.registerCommand('localpointer.openChat', async () => {
+			// Prefer native Chat (Cursor-like). Fall back to the LocalPointer sidebar webview.
+			try {
+				await vscode.commands.executeCommand('workbench.action.chat.open');
+			} catch {
+				chatView.focus();
+			}
+		}),
+		vscode.commands.registerCommand('localpointer.openSidebarChat', () => chatView.focus()),
 		vscode.commands.registerCommand('localpointer.inlineEdit', () => inlineEdit.run()),
 		vscode.commands.registerCommand('localpointer.agentEdit', () => agentEdit.run()),
 		vscode.commands.registerCommand('localpointer.toggleCompletions', () => toggleCompletions()),

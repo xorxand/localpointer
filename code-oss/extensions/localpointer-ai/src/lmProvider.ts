@@ -4,7 +4,8 @@
 
 import * as vscode from 'vscode';
 import { OllamaClient } from './ollama';
-import { getConfig, resolveModelName } from './config';
+import { getConfig, resolveRequestModel } from './config';
+import { AUTO_MODEL_ID, isAutoModelId } from './autoRouter';
 
 export class LocalPointerLmProvider implements vscode.Disposable {
 	private readonly emitter = new vscode.EventEmitter<void>();
@@ -19,21 +20,40 @@ export class LocalPointerLmProvider implements vscode.Disposable {
 				try {
 					names = await ollama.listModels();
 				} catch {
-					return [];
+					return [autoModelInfo()];
 				}
-				return names.map((name) => ({
-					id: name,
-					name,
-					family: 'ollama',
-					version: 'local',
-					maxInputTokens: 32768,
-					maxOutputTokens: 4096,
-					tooltip: `Local Ollama model: ${name}`,
-					detail: 'local · Ollama',
-					capabilities: {
-						toolCalling: true,
-					},
-				} satisfies vscode.LanguageModelChatInformation));
+				const models: vscode.LanguageModelChatInformation[] = [
+					autoModelInfo(),
+					...names.map((name) => ({
+						id: name,
+						name,
+						family: 'ollama',
+						version: 'local',
+						maxInputTokens: 32768,
+						maxOutputTokens: 4096,
+						tooltip: `Local Ollama model: ${name}`,
+						detail: 'local · Ollama',
+						capabilities: {
+							toolCalling: true,
+						},
+						isBYOK: true,
+						isUserSelectable: true,
+						isDefault: false,
+					} as vscode.LanguageModelChatInformation)),
+				];
+				// Mark Auto as default when no pinned model, else first concrete model.
+				const pinned = getConfig().model.trim();
+				if (!pinned || isAutoModelId(pinned)) {
+					(models[0] as { isDefault?: boolean }).isDefault = true;
+				} else {
+					const hit = models.find(m => m.id === pinned);
+					if (hit) {
+						(hit as { isDefault?: boolean }).isDefault = true;
+					} else if (models[1]) {
+						(models[1] as { isDefault?: boolean }).isDefault = true;
+					}
+				}
+				return models;
 			},
 			provideLanguageModelChatResponse: async (model, messages, _options, progress, token) => {
 				const ollama = new OllamaClient(getConfig().ollamaUrl);
@@ -41,11 +61,24 @@ export class LocalPointerLmProvider implements vscode.Disposable {
 					role: messageRole(m),
 					content: messageText(m),
 				}));
+				const userPrompt = ollamaMessages.filter(m => m.role === 'user').map(m => m.content).join('\n');
+				const resolved = await resolveRequestModel(ollama, {
+					configured: isAutoModelId(model.id) ? AUTO_MODEL_ID : model.id,
+					prompt: userPrompt,
+					signal: abortToSignal(token),
+				});
 				const controller = new AbortController();
 				const sub = token.onCancellationRequested(() => controller.abort());
 				try {
+					if (resolved.routedFromAuto) {
+						progress.report(new vscode.LanguageModelTextPart(
+							`_Auto → ${resolved.model}` +
+							(resolved.complexity ? ` (${resolved.complexity})` : '') +
+							`_\n\n`
+						));
+					}
 					await ollama.streamChat(
-						model.id,
+						resolved.model,
 						ollamaMessages,
 						tokenStr => progress.report(new vscode.LanguageModelTextPart(tokenStr)),
 						controller.signal,
@@ -70,6 +103,35 @@ export class LocalPointerLmProvider implements vscode.Disposable {
 		this.registration.dispose();
 		this.emitter.dispose();
 	}
+}
+
+function autoModelInfo(): vscode.LanguageModelChatInformation {
+	return {
+		id: AUTO_MODEL_ID,
+		name: 'Auto',
+		family: 'localpointer-auto',
+		version: 'local',
+		maxInputTokens: 32768,
+		maxOutputTokens: 4096,
+		tooltip: 'Cursor-like Auto: classify the request, then pick a local Ollama model',
+		detail: 'routes per request · Ollama',
+		capabilities: {
+			toolCalling: true,
+		},
+		isBYOK: true,
+		isUserSelectable: true,
+		isDefault: true,
+	} as vscode.LanguageModelChatInformation;
+}
+
+function abortToSignal(token: vscode.CancellationToken): AbortSignal {
+	const controller = new AbortController();
+	if (token.isCancellationRequested) {
+		controller.abort();
+	} else {
+		token.onCancellationRequested(() => controller.abort());
+	}
+	return controller.signal;
 }
 
 function messageRole(message: vscode.LanguageModelChatRequestMessage): 'system' | 'user' | 'assistant' {
@@ -102,17 +164,22 @@ export async function pickModelQuickPick(ollama: OllamaClient): Promise<string |
 		return undefined;
 	}
 	const current = getConfig().model;
-	const picked = await vscode.window.showQuickPick(models, {
+	const items = [
+		{ label: 'Auto', description: 'Route each request (cost / balance / intelligence)', model: '' },
+		...models.map(m => ({ label: m, description: 'Ollama', model: m })),
+	];
+	const picked = await vscode.window.showQuickPick(items, {
 		title: 'Select LocalPointer model',
 		placeHolder: current || 'Auto',
 	});
 	if (!picked) {
 		return undefined;
 	}
-	await vscode.workspace.getConfiguration('localpointer').update('model', picked, vscode.ConfigurationTarget.Global);
-	return picked;
+	await vscode.workspace.getConfiguration('localpointer').update('model', picked.model, vscode.ConfigurationTarget.Global);
+	return picked.model || AUTO_MODEL_ID;
 }
 
 export async function getActiveModel(ollama: OllamaClient): Promise<string> {
-	return resolveModelName(() => ollama.listModels());
+	const resolved = await resolveRequestModel(ollama);
+	return resolved.model;
 }

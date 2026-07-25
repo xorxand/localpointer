@@ -400,6 +400,24 @@ export class ExtHostLanguageModels implements ExtHostLanguageModelsShape {
 				break;
 			}
 		}
+		// LocalPointer / BYOK: accept any default for the Chat location (not only Copilot).
+		if (!defaultModelId) {
+			for (const [modelIdentifier, modelData] of this._localModels) {
+				if (modelData.metadata.isDefaultForLocation[ChatAgentLocation.Chat]) {
+					defaultModelId = modelIdentifier;
+					break;
+				}
+			}
+		}
+		// Last resort: first selectable model in the cache.
+		if (!defaultModelId) {
+			for (const [modelIdentifier, modelData] of this._localModels) {
+				if (modelData.metadata.isUserSelectable !== false) {
+					defaultModelId = modelIdentifier;
+					break;
+				}
+			}
+		}
 		if (!defaultModelId && !forceResolveModels) {
 			// Maybe the default wasn't cached so we will try again with resolving the models too
 			return this.getDefaultLanguageModel(extension, true);

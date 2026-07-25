@@ -5,9 +5,12 @@
 import * as vscode from 'vscode';
 import { DaemonManager } from './daemonManager';
 import { OllamaClient } from './ollama';
-import { activeEditorContext, getConfig, resolveModelName, setLastTransparency, workspaceFolderPath } from './config';
+import { activeEditorContext, getConfig, resolveRequestModel, setLastTransparency, workspaceFolderPath } from './config';
 import { getActiveModel } from './lmProvider';
 import { DaemonSSEEvent } from './daemon';
+import { ToolActivityCollector } from './toolActivity';
+
+const TOOL_THINKING_ID = 'localpointer-tools';
 
 export class ChatParticipantService implements vscode.Disposable {
 	private participant: vscode.ChatParticipant | undefined;
@@ -22,11 +25,27 @@ export class ChatParticipantService implements vscode.Disposable {
 			const cfg = getConfig();
 			const editorCtx = activeEditorContext();
 			const wsPath = workspaceFolderPath();
-			let model = cfg.model;
+			let model = '';
 			try {
-				model = await resolveModelName(() => this.ollama.listModels(), cfg.model);
+				const resolved = await resolveRequestModel(this.ollama, {
+					configured: cfg.model,
+					prompt: request.prompt,
+				});
+				model = resolved.model;
+				if (resolved.routedFromAuto) {
+					stream.markdown(`_LocalPointer Auto → **${model}**` +
+						(resolved.complexity ? ` · ${resolved.complexity}` : '') +
+						`_\n\n`);
+				} else {
+					stream.markdown(`_LocalPointer · ${model}_\n\n`);
+				}
 			} catch (err) {
 				stream.markdown(`**Error:** ${String(err)}`);
+				return;
+			}
+
+			if (!model) {
+				stream.markdown('**Error:** No Ollama models found. Run `ollama pull qwen2.5:7b` (or similar), then retry.');
 				return;
 			}
 
@@ -35,8 +54,10 @@ export class ChatParticipantService implements vscode.Disposable {
 			let full = '';
 			let stats: Record<string, unknown> | undefined;
 			let trace: unknown[] | undefined;
+			const tools = new ToolActivityCollector();
 
 			try {
+				const approvalState = { autoApprove: shouldAutoApproveTools(request, cfg.autoApprove) };
 				const daemon = await this.daemonManager.ensureRunning();
 				const health = await daemon.health();
 				if (health.ok && wsPath) {
@@ -47,9 +68,9 @@ export class ChatParticipantService implements vscode.Disposable {
 						model,
 						active_file: editorCtx.activeFile,
 						selection: editorCtx.selection,
-						auto_approve: cfg.autoApprove,
+						auto_approve: approvalState.autoApprove,
 					}, async (event: DaemonSSEEvent) => {
-						await handleDaemonEvent(event, stream, daemon, cfg.autoApprove);
+						await handleDaemonEvent(event, stream, daemon, approvalState, tools);
 						if (event.token) {
 							full += event.token;
 						}
@@ -59,7 +80,7 @@ export class ChatParticipantService implements vscode.Disposable {
 						if (event.trace) {
 							trace = event.trace;
 						}
-						if (event.error) {
+						if (event.error && !isToolStatus(event.status)) {
 							throw new Error(event.error);
 						}
 					}, controller.signal);
@@ -89,6 +110,15 @@ export class ChatParticipantService implements vscode.Disposable {
 
 			return { metadata: { model, stats, trace } };
 		});
+
+		try {
+			const ext = vscode.extensions.getExtension('localpointer.localpointer-ai');
+			if (ext) {
+				this.participant.iconPath = vscode.Uri.joinPath(ext.extensionUri, 'media', 'icon.svg');
+			}
+		} catch {
+			// optional icon
+		}
 	}
 
 	private async streamOllamaFallback(
@@ -109,33 +139,115 @@ export class ChatParticipantService implements vscode.Disposable {
 	}
 }
 
+function isToolStatus(status: string | undefined): boolean {
+	return status === 'tool_call'
+		|| status === 'tool_result'
+		|| status === 'tool_error'
+		|| status === 'tool_denied'
+		|| status === 'approved'
+		|| status === 'approval_required'
+		|| status === 'file_changed';
+}
+
+/** Map chat input permission picker (Ask / Allow all) to daemon auto_approve. */
+function shouldAutoApproveTools(request: vscode.ChatRequest, configAutoApprove: boolean): boolean {
+	const level = request.permissionLevel;
+	if (level === 'autoApprove' || level === 'autopilot') {
+		return true;
+	}
+	if (level === 'default' || level === 'assisted') {
+		return false;
+	}
+	return configAutoApprove;
+}
+
+function toolApprovalDecision(answers: Record<string, unknown> | undefined): 'allow' | 'deny' | 'runAll' {
+	const raw = answers?.decision;
+	let value: unknown = raw;
+	if (raw && typeof raw === 'object' && 'selectedValue' in raw) {
+		value = (raw as { selectedValue?: unknown }).selectedValue;
+	}
+	if (value === 'allow') {
+		return 'allow';
+	}
+	if (value === 'runAll') {
+		return 'runAll';
+	}
+	return 'deny';
+}
+
+async function enableRunEverythingMode(): Promise<void> {
+	await vscode.workspace.getConfiguration('localpointer').update('autoApprove', true, vscode.ConfigurationTarget.Global);
+	try {
+		await vscode.commands.executeCommand('workbench.action.chat.openPermissionPicker', true);
+	} catch {
+		// Toggle may be unavailable outside the panel chat surface.
+	}
+}
+
+function emitToolActivity(stream: vscode.ChatResponseStream, tools: ToolActivityCollector, event: DaemonSSEEvent): void {
+	const entry = tools.consume(event);
+	if (!entry) {
+		return;
+	}
+	stream.thinkingProgress({
+		id: TOOL_THINKING_ID,
+		text: entry.text,
+		metadata: { title: tools.summaryLabel() },
+	});
+}
+
 async function handleDaemonEvent(
 	event: DaemonSSEEvent,
 	stream: vscode.ChatResponseStream,
 	daemon: import('./daemon').DaemonClient,
-	autoApprove: boolean,
+	approvalState: { autoApprove: boolean },
+	tools: ToolActivityCollector,
 ): Promise<void> {
 	if (event.token) {
 		stream.markdown(event.token);
 	}
+
+	emitToolActivity(stream, tools, event);
+
 	if (event.status === 'approval_required' && event.id && event.tool) {
-		if (autoApprove) {
+		if (approvalState.autoApprove) {
 			await daemon.approve(event.id, 'allow');
-			stream.markdown(`\n\n*Auto-approved tool: ${event.tool}*\n`);
 			return;
 		}
-		const argsPreview = event.args ? `\n\`\`\`json\n${JSON.stringify(event.args, null, 2)}\n\`\`\`` : '';
-		const choice = await vscode.window.showWarningMessage(
-			`Allow agent tool "${event.tool}"?`,
-			{ modal: true, detail: argsPreview },
-			'Allow',
-			'Deny',
-		);
-		await daemon.approve(event.id, choice === 'Allow' ? 'allow' : 'deny');
-		stream.markdown(`\n\n*Tool ${event.tool}: ${choice === 'Allow' ? 'allowed' : 'denied'}*\n`);
-	}
-	if (event.trace && event.done) {
-		stream.markdown(`\n\n---\n**Trace:** ${event.trace.length} step(s)\n`);
+		const argsPreview = event.args
+			? new vscode.MarkdownString(`\`\`\`json\n${JSON.stringify(event.args, null, 2)}\n\`\`\``)
+			: undefined;
+		const answers = await stream.questionCarousel([
+			new vscode.ChatQuestion(
+				'decision',
+				vscode.ChatQuestionType.SingleSelect,
+				`Allow tool \`${event.tool}\`?`,
+				{
+					message: argsPreview,
+					options: [
+						{ id: 'allow', label: 'Allow', value: 'allow' },
+						{ id: 'deny', label: 'Deny', value: 'deny' },
+						{ id: 'runAll', label: 'Run all', value: 'runAll' },
+					],
+					defaultValue: 'allow',
+					allowFreeformInput: false,
+				},
+			),
+		], false);
+		const decision = toolApprovalDecision(answers);
+		if (decision === 'runAll') {
+			approvalState.autoApprove = true;
+			await enableRunEverythingMode();
+			await daemon.approve(event.id, 'allow');
+			stream.thinkingProgress({
+				id: TOOL_THINKING_ID,
+				text: `*Run everything on — further tools will not ask*\n\n`,
+				metadata: { title: tools.summaryLabel() },
+			});
+			return;
+		}
+		await daemon.approve(event.id, decision);
 	}
 }
 
@@ -194,17 +306,12 @@ export class AgentEditService {
 }
 
 async function applyTextEdit(editor: vscode.TextEditor, text: string): Promise<void> {
-	const range = editor.selection.isEmpty
-		? new vscode.Range(editor.document.positionAt(0), editor.document.positionAt(editor.document.getText().length))
+	const full = editor.selection.isEmpty
+		? new vscode.Range(0, 0, editor.document.lineCount, 0)
 		: editor.selection;
-	const ok = await editor.edit(builder => builder.replace(range, text));
-	if (!ok) {
-		vscode.window.showErrorMessage('Failed to apply agent edit.');
-	}
+	await editor.edit(b => b.replace(full, text));
 }
 
 function stripFences(text: string): string {
-	const trimmed = text.trim();
-	const m = /^```[\w]*\n([\s\S]*?)\n```$/.exec(trimmed);
-	return m ? m[1] : trimmed;
+	return text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
 }

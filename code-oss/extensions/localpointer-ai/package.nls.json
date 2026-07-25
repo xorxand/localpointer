@@ -18,6 +18,6 @@
 	"config.model": "Default Ollama model name. Empty means auto-select the first available model.",
 	"config.completions.enabled": "Enable inline code completions from local models.",
 	"config.completions.debounceMs": "Debounce delay in milliseconds before requesting completions.",
-	"config.autoApprove": "Automatically approve agent tool actions without prompting.",
+	"config.autoApprove": "When true, agent tools run without asking (Allow all). Prefer the Ask / Allow all control near the chat input when using Agent mode.",
 	"config.daemonPath": "Path to the localpointer-daemon binary. Empty searches next to the extension and PATH."
 }

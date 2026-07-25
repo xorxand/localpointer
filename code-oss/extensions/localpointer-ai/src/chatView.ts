@@ -3,10 +3,13 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DaemonManager } from './daemonManager';
 import { OllamaClient } from './ollama';
 import { getConfig, getLastTransparency, resolveModelName, setLastTransparency, workspaceFolderPath } from './config';
 import { DaemonSSEEvent } from './daemon';
+import { ToolActivityCollector } from './toolActivity';
 
 interface ChatMessage {
 	role: 'user' | 'assistant' | 'system';
@@ -19,14 +22,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private view: vscode.WebviewView | undefined;
 	private conversationId: number | undefined;
 	private readonly messages: ChatMessage[] = [];
-	private agentMode = true;
+	/** Model selected for this chat panel (not necessarily the global setting). */
+	private selectedModel = '';
+	private agentMode = false;
 	private showWhy = false;
+	/** Mirrors Ask / Allow all control (synced with localpointer.autoApprove). */
+	private autoApproveTools = false;
+	private sending = false;
+	private sendGen = 0;
+	private abort: AbortController | undefined;
+	private messageSub: vscode.Disposable | undefined;
+	/** Resolvers waiting on inline Allow/Deny for daemon tool approvals. */
+	private readonly pendingApprovals = new Map<string, (result: { allow: boolean; runAll: boolean }) => void>();
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly daemonManager: DaemonManager,
-		private readonly ollama: OllamaClient,
-	) { }
+		_ollama: OllamaClient,
+	) {
+		void _ollama;
+	}
+
+	private ollama(): OllamaClient {
+		return new OllamaClient(getConfig().ollamaUrl);
+	}
 
 	resolveWebviewView(
 		webviewView: vscode.WebviewView,
@@ -34,33 +53,84 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		_token: vscode.CancellationToken,
 	): void {
 		this.view = webviewView;
+		// Remount / re-show must not leave a stuck "sending" lock from a prior view.
+		this.abortInFlight('Chat panel reloaded');
+		this.sending = false;
+
 		webviewView.webview.options = {
 			enableScripts: true,
 			localResourceRoots: [this.context.extensionUri],
 		};
-		webviewView.webview.html = this.getHtml();
-		webviewView.webview.onDidReceiveMessage(async msg => {
-			switch (msg.type) {
-				case 'ready':
-					await this.postInit();
-					break;
-				case 'send':
-					await this.handleSend(String(msg.text ?? ''));
-					break;
-				case 'selectModel':
-					await this.selectModel(String(msg.model ?? ''));
-					break;
-				case 'toggleAgent':
-					this.agentMode = !!msg.enabled;
-					break;
-				case 'toggleWhy':
-					this.showWhy = !!msg.enabled;
-					this.postWhy();
-					break;
-				case 'approve':
-					await this.handleApprove(String(msg.id ?? ''), msg.allow === true);
-					break;
+		webviewView.webview.html = this.getHtml(webviewView.webview);
+
+		this.messageSub?.dispose();
+		this.messageSub = webviewView.webview.onDidReceiveMessage(async msg => {
+			try {
+				switch (msg?.type) {
+					case 'ready':
+					case 'refreshModels':
+						await this.postInit();
+						break;
+					case 'send':
+						await this.handleSend(String(msg.text ?? ''), msg.model ? String(msg.model) : undefined);
+						break;
+					case 'selectModel':
+						this.selectModel(String(msg.model ?? ''));
+						break;
+					case 'toggleAgent':
+						this.agentMode = !!msg.enabled;
+						this.postStatus(this.agentMode ? 'Agent mode on (tools via local daemon)' : 'Chat mode (direct Ollama)');
+						break;
+					case 'toggleWhy':
+						this.showWhy = !!msg.enabled;
+						this.postWhy();
+						break;
+					case 'setApprovalMode': {
+						const allowAll = String(msg.mode ?? '') === 'allowAll';
+						this.autoApproveTools = allowAll;
+						void vscode.workspace.getConfiguration('localpointer').update(
+							'autoApprove',
+							allowAll,
+							vscode.ConfigurationTarget.Global,
+						);
+						this.postStatus(allowAll ? 'Tools: Run everything on' : 'Tools: Ask before each tool');
+						break;
+					}
+					case 'approve': {
+						const id = String(msg.id ?? '');
+						const allow = msg.allow === true;
+						const runAll = msg.runAll === true;
+						const resolve = this.pendingApprovals.get(id);
+						if (resolve) {
+							this.pendingApprovals.delete(id);
+							resolve({ allow, runAll });
+						}
+						break;
+					}
+					case 'clear':
+						this.rejectPendingApprovals();
+						this.abortInFlight();
+						this.messages.length = 0;
+						this.conversationId = undefined;
+						this.postMessage({ type: 'messages', messages: [] });
+						this.postStatus('Chat cleared');
+						break;
+				}
+			} catch (err) {
+				this.postStatus(`Error: ${String(err)}`);
+				this.postMessage({ type: 'streaming', active: false });
+				this.postMessage({ type: 'sendRejected', reason: String(err) });
+				this.sending = false;
 			}
+		});
+
+		webviewView.onDidDispose(() => {
+			this.messageSub?.dispose();
+			this.messageSub = undefined;
+			if (this.view === webviewView) {
+				this.view = undefined;
+			}
+			this.abortInFlight();
 		});
 	}
 
@@ -72,57 +142,184 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
+	private abortInFlight(status?: string): void {
+		this.sendGen++;
+		this.rejectPendingApprovals();
+		if (this.abort) {
+			this.abort.abort();
+			this.abort = undefined;
+		}
+		this.sending = false;
+		this.postMessage({ type: 'streaming', active: false });
+		if (status) {
+			this.postMessage({ type: 'reset', text: status });
+		}
+	}
+
+	private rejectPendingApprovals(): void {
+		for (const [id, resolve] of this.pendingApprovals) {
+			resolve({ allow: false, runAll: false });
+			this.pendingApprovals.delete(id);
+		}
+	}
+
+	private waitForInlineApproval(id: string): Promise<{ allow: boolean; runAll: boolean }> {
+		return new Promise(resolve => {
+			this.pendingApprovals.set(id, resolve);
+		});
+	}
+
 	private async postInit(): Promise<void> {
-		const models = await this.safeListModels();
-		const model = await resolveModelName(() => Promise.resolve(models)).catch(() => '');
+		const ollama = this.ollama();
+		const ollamaOk = await ollama.health();
+		let models: string[] = [];
+		let error = '';
+		try {
+			models = await this.safeListModels();
+		} catch (err) {
+			error = String(err);
+		}
+
+		if (!this.selectedModel || !models.includes(this.selectedModel)) {
+			try {
+				this.selectedModel = await resolveModelName(() => Promise.resolve(models), this.selectedModel || getConfig().model);
+			} catch {
+				this.selectedModel = models[0] ?? '';
+			}
+		}
+
+		this.autoApproveTools = getConfig().autoApprove;
+
 		this.postMessage({
 			type: 'init',
 			models,
-			model,
+			model: this.selectedModel,
 			agentMode: this.agentMode,
+			approvalMode: this.autoApproveTools ? 'allowAll' : 'ask',
 			showWhy: this.showWhy,
 			messages: this.messages,
+			ollamaOk,
+			ollamaUrl: getConfig().ollamaUrl,
+			error,
 		});
 		this.postWhy();
+
+		if (!ollamaOk) {
+			this.postStatus(`Ollama unreachable at ${getConfig().ollamaUrl}`);
+		} else if (models.length === 0) {
+			this.postStatus('No models found. Run: ollama pull qwen2.5:7b');
+		} else {
+			this.postStatus(`Ready · ${models.length} model(s) · ${this.selectedModel || 'none selected'}`);
+		}
 	}
 
-	private async handleSend(text: string): Promise<void> {
+	private async handleSend(text: string, modelFromUi?: string): Promise<void> {
 		const prompt = text.trim();
-		if (!prompt || !this.view) {
+		if (!prompt) {
+			this.postMessage({ type: 'sendRejected', reason: 'Empty message' });
 			return;
 		}
+		if (!this.view) {
+			this.postMessage({ type: 'sendRejected', reason: 'Chat panel is not ready — reopen LocalPointer Chat' });
+			return;
+		}
+		if (this.sending) {
+			this.postMessage({ type: 'sendRejected', reason: 'Already generating a reply — wait or Clear to cancel' });
+			return;
+		}
+
+		if (modelFromUi?.trim()) {
+			this.selectedModel = modelFromUi.trim();
+		}
+
+		if (!this.selectedModel) {
+			await this.postInit();
+			if (!this.selectedModel) {
+				this.postMessage({ type: 'sendRejected', reason: 'Pick a model first (or pull one with ollama).' });
+				return;
+			}
+		}
+
+		const gen = this.sendGen;
+		this.sending = true;
+		this.abort = new AbortController();
+		const signal = this.abort.signal;
+		this.postMessage({ type: 'sendAccepted' });
+
 		this.messages.push({ role: 'user', content: prompt });
 		this.postMessage({ type: 'messages', messages: this.messages });
-		this.postMessage({ type: 'streaming', active: true });
+		this.postMessage({ type: 'streaming', active: true, model: this.selectedModel });
+		this.postStatus(`Talking to ${this.selectedModel}…`);
 
-		const cfg = getConfig();
-		let model = cfg.model;
+		const model = this.selectedModel;
 		let assistant = '';
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
 
 		try {
-			model = await resolveModelName(() => this.ollama.listModels(), cfg.model);
+			const ollamaOk = await this.ollama().health();
+			if (!ollamaOk) {
+				throw new Error(`Ollama is not reachable at ${getConfig().ollamaUrl}`);
+			}
+			if (signal.aborted || gen !== this.sendGen) {
+				throw new Error('Cancelled');
+			}
+
 			if (this.agentMode) {
-				const result = await this.agentChat(prompt, model, cfg.autoApprove);
+				const result = await this.agentChat(prompt, model);
 				assistant = result.content;
 				stats = result.stats;
 				trace = result.trace;
 				this.conversationId = result.conversationId ?? this.conversationId;
 			} else {
-				const result = await this.ollama.streamChat(
+				const history = this.messages
+					.filter(m => m.role === 'user' || m.role === 'assistant')
+					.slice(0, -1)
+					.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+				const result = await this.ollama().streamChat(
 					model,
-					[...this.messages.slice(0, -1), { role: 'user', content: prompt }],
+					[
+						{
+							role: 'system',
+							content: 'You are LocalPointer, a coding assistant running entirely on the user\'s local Ollama models. Be concise and helpful.',
+						},
+						...history,
+						{ role: 'user', content: prompt },
+					],
 					token => {
+						if (gen !== this.sendGen) {
+							return;
+						}
 						assistant += token;
 						this.postMessage({ type: 'streamToken', token });
 					},
+					signal,
 				);
-				assistant = result.content;
-				stats = result.stats as Record<string, unknown>;
+				assistant = result.content || assistant;
+				stats = {
+					prompt_tokens: result.stats.prompt_eval_count,
+					completion_tokens: result.stats.eval_count,
+					total_ms: result.stats.total_duration ? Math.round(result.stats.total_duration / 1e6) : undefined,
+					load_ms: result.stats.load_duration ? Math.round(result.stats.load_duration / 1e6) : undefined,
+				};
+			}
+
+			if (!assistant.trim()) {
+				assistant = '(empty response from model)';
 			}
 		} catch (err) {
-			assistant = `Error: ${String(err)}`;
+			const msg = String(err);
+			assistant = signal.aborted || gen !== this.sendGen ? '(cancelled)' : `Error: ${msg}`;
+			if (gen === this.sendGen) {
+				this.postStatus(assistant);
+			}
+		}
+
+		// Cleared / remounted while in flight — do not clobber the new panel state.
+		if (gen !== this.sendGen) {
+			this.abort = undefined;
+			this.sending = false;
+			return;
 		}
 
 		this.messages.push({ role: 'assistant', content: assistant });
@@ -130,19 +327,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		this.postMessage({ type: 'messages', messages: this.messages });
 		this.postMessage({ type: 'streaming', active: false });
 		this.postWhy();
+		if (!assistant.startsWith('Error:') && assistant !== '(cancelled)') {
+			this.postStatus(`Done · ${model}`);
+		}
+		this.abort = undefined;
+		this.sending = false;
 	}
 
 	private async agentChat(
 		prompt: string,
 		model: string,
-		autoApprove: boolean,
 	): Promise<{ content: string; stats?: Record<string, unknown>; trace?: unknown[]; conversationId?: number }> {
 		const daemon = await this.daemonManager.ensureRunning();
 		const wsPath = workspaceFolderPath();
-		if (!(await daemon.health()).ok || !wsPath) {
-			const result = await this.ollama.streamChat(model, [{ role: 'user', content: prompt }], token => {
-				this.postMessage({ type: 'streamToken', token });
-			});
+		const healthy = (await daemon.health()).ok;
+
+		// No workspace or daemon → plain Ollama chat (still local).
+		if (!healthy || !wsPath) {
+			this.postStatus(!wsPath
+				? 'No folder open — using direct Ollama (no tools)'
+				: 'Daemon unavailable — using direct Ollama');
+			const history = this.messages
+				.filter(m => m.role === 'user' || m.role === 'assistant')
+				.slice(0, -1)
+				.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+			const result = await this.ollama().streamChat(
+				model,
+				[...history, { role: 'user', content: prompt }],
+				token => this.postMessage({ type: 'streamToken', token }),
+				this.abort?.signal,
+			);
 			return { content: result.content, stats: result.stats as Record<string, unknown> };
 		}
 
@@ -151,13 +365,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
 		let conversationId: number | undefined;
+		const tools = new ToolActivityCollector();
 
 		await daemon.chat({
 			workspace_id: workspaceId,
 			conversation_id: this.conversationId,
 			message: prompt,
 			model,
-			auto_approve: autoApprove,
+			auto_approve: this.autoApproveTools,
 		}, async (event: DaemonSSEEvent) => {
 			if (event.conversation_id) {
 				conversationId = event.conversation_id;
@@ -172,8 +387,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			if (event.trace) {
 				trace = event.trace;
 			}
+			const activity = tools.consume(event);
+			if (activity) {
+				this.postMessage({
+					type: 'toolActivity',
+					text: activity.text,
+					summary: tools.summaryLabel(),
+					toolCount: tools.count,
+				});
+			}
 			if (event.status === 'approval_required' && event.id && event.tool) {
-				if (autoApprove) {
+				if (this.autoApproveTools) {
 					await daemon.approve(event.id, 'allow');
 				} else {
 					this.postMessage({
@@ -182,15 +406,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						tool: event.tool,
 						args: event.args ?? {},
 					});
-					const choice = await vscode.window.showWarningMessage(
-						`Allow tool "${event.tool}"?`,
-						'Allow',
-						'Deny',
-					);
-					await daemon.approve(event.id, choice === 'Allow' ? 'allow' : 'deny');
+					const choice = await this.waitForInlineApproval(event.id);
+					this.postMessage({ type: 'approvalResolved', id: event.id });
+					if (choice.runAll) {
+						this.autoApproveTools = true;
+						void vscode.workspace.getConfiguration('localpointer').update(
+							'autoApprove',
+							true,
+							vscode.ConfigurationTarget.Global,
+						);
+						this.postMessage({ type: 'approvalMode', mode: 'allowAll' });
+						this.postStatus('Tools: Run everything on');
+						this.postMessage({
+							type: 'toolActivity',
+							text: '*Run everything on — further tools will not ask*\n\n',
+							summary: tools.summaryLabel(),
+							toolCount: tools.count,
+						});
+					}
+					await daemon.approve(event.id, choice.allow || choice.runAll ? 'allow' : 'deny');
 				}
 			}
-			if (event.error) {
+			if (event.error && !isToolStatus(event.status)) {
 				throw new Error(event.error);
 			}
 		});
@@ -198,17 +435,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		return { content, stats, trace, conversationId };
 	}
 
-	private async handleApprove(id: string, allow: boolean): Promise<void> {
-		const daemon = await this.daemonManager.ensureRunning();
-		await daemon.approve(id, allow ? 'allow' : 'deny');
-	}
-
-	private async selectModel(model: string): Promise<void> {
-		await vscode.workspace.getConfiguration('localpointer').update('model', model, vscode.ConfigurationTarget.Global);
-		this.postMessage({ type: 'model', model });
+	private selectModel(model: string): void {
+		const name = model.trim();
+		if (!name) {
+			return;
+		}
+		this.selectedModel = name;
+		// Persist as the user's default for new panels / other features.
+		void vscode.workspace.getConfiguration('localpointer').update('model', name, vscode.ConfigurationTarget.Global);
+		this.postMessage({ type: 'model', model: name });
+		this.postStatus(`Model: ${name}`);
 	}
 
 	private async safeListModels(): Promise<string[]> {
+		// Prefer Ollama directly — authoritative source of installed models.
+		try {
+			const models = await this.ollama().listModels();
+			if (models.length > 0) {
+				return models;
+			}
+		} catch {
+			// fall through
+		}
 		try {
 			const daemon = await this.daemonManager.ensureRunning();
 			if ((await daemon.health()).ok) {
@@ -217,11 +465,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		} catch {
 			// ignore
 		}
-		try {
-			return await this.ollama.listModels();
-		} catch {
-			return [];
-		}
+		return [];
 	}
 
 	private postWhy(): void {
@@ -232,11 +476,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		this.postMessage({ type: 'why', info: getLastTransparency() });
 	}
 
+	private postStatus(text: string): void {
+		this.postMessage({ type: 'status', text });
+	}
+
 	private postMessage(payload: unknown): void {
 		void this.view?.webview.postMessage(payload);
 	}
 
-	private getHtml(): string {
+	private getHtml(_webview: vscode.Webview): string {
+		// Inline media so submit handlers always load (no CSP / asWebviewUri failures).
+		const mediaRoot = vscode.Uri.joinPath(this.context.extensionUri, 'media');
+		const css = this.readMedia(mediaRoot, 'chat.css');
+		const js = this.readMedia(mediaRoot, 'chat.js');
 		const csp = [
 			"default-src 'none'",
 			"style-src 'unsafe-inline'",
@@ -249,237 +501,58 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
-:root {
-  color-scheme: dark;
-  --bg: var(--vscode-editor-background, #1e1e1e);
-  --fg: var(--vscode-editor-foreground, #d4d4d4);
-  --muted: var(--vscode-descriptionForeground, #9da5b4);
-  --border: var(--vscode-panel-border, #3c3c3c);
-  --input-bg: var(--vscode-input-background, #3c3c3c);
-  --input-fg: var(--vscode-input-foreground, #cccccc);
-  --btn-bg: var(--vscode-button-background, #0e639c);
-  --btn-fg: var(--vscode-button-foreground, #ffffff);
-  --accent: var(--vscode-focusBorder, #007fd4);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: var(--vscode-font-family, sans-serif);
-  font-size: var(--vscode-font-size, 13px);
-  background: var(--bg);
-  color: var(--fg);
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-.toolbar, .controls, .input-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.toolbar label, .controls label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-}
-select, textarea, button {
-  font: inherit;
-}
-select {
-  flex: 1;
-  background: var(--input-bg);
-  color: var(--input-fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-.messages {
-  flex: 1;
-  overflow: auto;
-  padding: 8px;
-}
-.msg {
-  margin-bottom: 12px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.msg.user { border-color: var(--accent); }
-.msg.assistant { background: rgba(255,255,255,0.03); }
-.role {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.why-panel {
-  max-height: 140px;
-  overflow: auto;
-  padding: 8px;
-  border-top: 1px solid var(--border);
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 11px;
-  color: var(--muted);
-  display: none;
-}
-.why-panel.visible { display: block; }
-.input-row {
-  border-top: 1px solid var(--border);
-  border-bottom: none;
-}
-textarea {
-  flex: 1;
-  min-height: 64px;
-  resize: vertical;
-  background: var(--input-bg);
-  color: var(--input-fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 8px;
-}
-button {
-  background: var(--btn-bg);
-  color: var(--btn-fg);
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-button:disabled { opacity: 0.5; cursor: default; }
-.status { padding: 0 8px 8px; color: var(--muted); font-size: 11px; }
+${css}
 </style>
 </head>
 <body>
 <div class="toolbar">
-  <label>Model</label>
-  <select id="model"></select>
+  <label for="model">Model</label>
+  <select id="model" aria-label="Ollama model"></select>
+  <button type="button" class="secondary" id="refresh" title="Reload models from Ollama">Refresh</button>
 </div>
 <div class="controls">
-  <label><input type="checkbox" id="agent" checked /> Agent</label>
+  <label><input type="checkbox" id="agent" /> Agent tools</label>
+  <label class="approval-mode" id="approvalModeWrap" title="When on, tools run without asking">
+    <input type="checkbox" id="runEverything" /> Run everything
+  </label>
   <label><input type="checkbox" id="why" /> Why / stats</label>
+  <button type="button" class="secondary" id="clear">Clear</button>
 </div>
-<div class="messages" id="messages"></div>
+<div class="messages" id="messages"><div class="empty">Loading models from Ollama\u2026</div></div>
 <div class="why-panel" id="whyPanel"></div>
 <div class="status" id="status"></div>
-<div class="input-row">
-  <textarea id="input" placeholder="Ask LocalPointer…"></textarea>
-  <button id="send">Send</button>
+<div class="working-banner" id="workingBanner" aria-live="polite">
+  <div class="spinner" aria-hidden="true"></div>
+  <div class="label" id="workingLabel">Model is working\u2026</div>
+  <div class="elapsed" id="workingElapsed">0s</div>
+</div>
+<div class="input-row" id="inputRow">
+  <div class="composer">
+    <textarea id="input" placeholder="Ask LocalPointer\u2026" rows="3"></textarea>
+    <div class="hint" id="hint">Enter to send \u00b7 Ctrl+Enter or Shift+Enter for newline</div>
+  </div>
+  <div class="actions">
+    <button type="button" id="send">Send</button>
+  </div>
 </div>
 <script>
-const vscode = acquireVsCodeApi();
-const modelEl = document.getElementById('model');
-const messagesEl = document.getElementById('messages');
-const inputEl = document.getElementById('input');
-const sendBtn = document.getElementById('send');
-const agentEl = document.getElementById('agent');
-const whyEl = document.getElementById('why');
-const whyPanel = document.getElementById('whyPanel');
-const statusEl = document.getElementById('status');
-let streaming = false;
-let streamBuf = '';
-
-function renderMessages(msgs) {
-  messagesEl.innerHTML = '';
-  for (const m of msgs) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + m.role;
-    div.innerHTML = '<div class="role">' + m.role + '</div>' + escapeHtml(m.content);
-    messagesEl.appendChild(div);
-  }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function setStreaming(active) {
-  streaming = active;
-  sendBtn.disabled = active;
-  statusEl.textContent = active ? 'Generating…' : '';
-  if (active) {
-    streamBuf = '';
-    const div = document.createElement('div');
-    div.className = 'msg assistant';
-    div.id = 'stream';
-    div.innerHTML = '<div class="role">assistant</div><span id="streamBody"></span>';
-    messagesEl.appendChild(div);
-  } else {
-    const stream = document.getElementById('stream');
-    if (stream) stream.removeAttribute('id');
-  }
-}
-
-sendBtn.addEventListener('click', () => {
-  const text = inputEl.value.trim();
-  if (!text || streaming) return;
-  inputEl.value = '';
-  vscode.postMessage({ type: 'send', text });
-});
-
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    sendBtn.click();
-  }
-});
-
-modelEl.addEventListener('change', () => {
-  vscode.postMessage({ type: 'selectModel', model: modelEl.value });
-});
-
-agentEl.addEventListener('change', () => {
-  vscode.postMessage({ type: 'toggleAgent', enabled: agentEl.checked });
-});
-
-whyEl.addEventListener('change', () => {
-  whyPanel.classList.toggle('visible', whyEl.checked);
-  vscode.postMessage({ type: 'toggleWhy', enabled: whyEl.checked });
-});
-
-window.addEventListener('message', (event) => {
-  const msg = event.data;
-  switch (msg.type) {
-    case 'init':
-      modelEl.innerHTML = (msg.models || []).map(m => '<option value="' + m + '">' + m + '</option>').join('');
-      if (msg.model) modelEl.value = msg.model;
-      agentEl.checked = !!msg.agentMode;
-      whyEl.checked = !!msg.showWhy;
-      whyPanel.classList.toggle('visible', !!msg.showWhy);
-      renderMessages(msg.messages || []);
-      break;
-    case 'messages':
-      renderMessages(msg.messages || []);
-      break;
-    case 'streaming':
-      setStreaming(!!msg.active);
-      break;
-    case 'streamToken':
-      streamBuf += msg.token || '';
-      const body = document.getElementById('streamBody');
-      if (body) body.textContent = streamBuf;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      break;
-    case 'model':
-      if (msg.model) modelEl.value = msg.model;
-      break;
-    case 'why':
-      whyPanel.textContent = msg.info ? JSON.stringify(msg.info, null, 2) : '';
-      break;
-    case 'approval':
-      statusEl.textContent = 'Approval required for ' + (msg.tool || 'tool') + '…';
-      break;
-  }
-});
-
-vscode.postMessage({ type: 'ready' });
+${js}
 </script>
 </body>
 </html>`;
 	}
+
+	private readMedia(mediaRoot: vscode.Uri, fileName: string): string {
+		return fs.readFileSync(path.join(mediaRoot.fsPath, fileName), 'utf8');
+	}
+}
+
+function isToolStatus(status: string | undefined): boolean {
+	return status === 'tool_call'
+		|| status === 'tool_result'
+		|| status === 'tool_error'
+		|| status === 'tool_denied'
+		|| status === 'approved'
+		|| status === 'approval_required'
+		|| status === 'file_changed';
 }

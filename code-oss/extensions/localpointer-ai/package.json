@@ -20,11 +20,16 @@
     }
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:localpointer.chatView",
+    "onLanguageModelChatProvider:localpointer",
+    "onChatParticipant:localpointer.agent"
   ],
   "enabledApiProposals": [
     "chatParticipantAdditions",
-    "defaultChatParticipant"
+    "chatParticipantPrivate",
+    "defaultChatParticipant",
+    "chatProvider"
   ],
   "main": "./out/extension",
   "scripts": {
@@ -56,6 +61,11 @@
         "title": "%command.openChat%",
         "category": "%command.category%",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "localpointer.openSidebarChat",
+        "title": "Open LocalPointer Sidebar Chat",
+        "category": "%command.category%"
       },
       {
         "command": "localpointer.inlineEdit",
@@ -165,6 +175,12 @@
           "default": false,
           "description": "%config.autoApprove%"
         },
+        "localpointer.auto.mode": {
+          "type": "string",
+          "enum": ["cost", "balance", "intelligence"],
+          "default": "balance",
+          "description": "When model is Auto: how to route each request across local Ollama models (Cursor-like Optimize For)."
+        },
         "localpointer.daemonPath": {
           "type": "string",
           "default": "",
@@ -182,10 +198,19 @@
       {
         "id": "localpointer.agent",
         "name": "localpointer",
-        "description": "Local agent with workspace tools",
-        "isDefault": true
+        "fullName": "LocalPointer",
+        "description": "Local Ollama agent with workspace tools",
+        "isDefault": true,
+        "locations": ["panel"],
+        "modes": ["ask", "edit", "agent"],
+        "sampleRequest": "Explain the selected code"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "chat.agent.enabled": true,
+      "chat.agent.maxRequests": 15,
+      "chat.extensionUnification.enabled": false
+    }
   },
   "devDependencies": {
     "@types/node": "24.x"

@@ -7,6 +7,7 @@ import { Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IContextKey, IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+import product from '../../../../platform/product/common/product.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { ChatEntitlementContextKeys } from '../../../services/chat/common/chatEntitlementService.js';
@@ -15,6 +16,11 @@ import { ChatContextKeys } from '../common/actions/chatContextKeys.js';
 import { ChatConfiguration } from '../common/constants.js';
 import { COPILOT_VENDOR_ID } from '../common/languageModels.js';
 import { ILanguageModelsConfigurationService } from '../common/languageModelsConfiguration.js';
+
+function isLocalOnlyChatProduct(): boolean {
+	const providerId = product.defaultChatAgent?.provider?.default?.id;
+	return !providerId || providerId === 'none';
+}
 
 /**
  * Owns the `github.copilot.hasByokModels` context key. The key is true iff:
@@ -102,6 +108,12 @@ export class HasByokModelsContribution extends Disposable implements IWorkbenchC
 	}
 
 	private _update(): void {
+		// LocalPointer: Ollama models count as available — never clear this for Copilot gating.
+		if (isLocalOnlyChatProduct()) {
+			this._setResult(true);
+			return;
+		}
+
 		if (!this._isFeatureEnabled()) {
 			this._setResult(false);
 			return;

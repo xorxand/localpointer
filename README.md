@@ -107,7 +107,9 @@ localpointer/
 
 ## Local-only promise
 
-The extension and daemon talk only to `localpointer.*` URLs you configure (defaults are loopback Ollama/daemon). There is no Cursor account, no cloud model routing, and no telemetry added by LocalPointer AI.
+The extension and daemon talk only to `localpointer.*` URLs you configure (defaults are loopback Ollama/daemon). There is **no GitHub Copilot**, no Cursor account, no cloud model routing, and no telemetry added by LocalPointer AI.
+
+The built-in `extensions/copilot` tree from upstream VS Code has been **removed**. Product `defaultChatAgent` / Copilot entitlement URLs are gone, and `chat.agentHost.enabled` defaults to `false` so the Agent Host Copilot CLI/SDK path stays off.
 
 ## License
 

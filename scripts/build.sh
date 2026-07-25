@@ -9,7 +9,6 @@ go build -o localpointer-daemon .
 ln -sfn "$ROOT/daemon/localpointer-daemon" "$ROOT/code-oss/extensions/localpointer-ai/bin/localpointer-daemon"
 echo "    OK: $ROOT/daemon/localpointer-daemon"
 
-if [[ "${1:-}" == "--ide" || "${1:-}" == "all" ]]; then
   echo "==> Compiling Code-OSS (LocalPointer)"
   cd "$ROOT/code-oss"
   if [[ ! -d node_modules ]]; then
@@ -18,6 +17,5 @@ if [[ "${1:-}" == "--ide" || "${1:-}" == "all" ]]; then
   npm run gulp -- compile
   npm run gulp -- compile-extension:localpointer-ai
   echo "    OK: run ./scripts/start-localpointer.sh"
-fi
 
 echo "Done."

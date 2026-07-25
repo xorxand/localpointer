@@ -945,9 +945,14 @@ export class ExtHostChatAgents2 extends Disposable implements ExtHostChatAgentsS
 		}
 		if (!model) {
 			model = await this._languageModels.getDefaultLanguageModel(extension);
-			if (!model) {
-				throw new Error('Language model unavailable');
-			}
+		}
+		if (!model) {
+			// LocalPointer: force a fresh model resolve, then take any available chat model.
+			const models = await this._languageModels.selectLanguageModels(extension, {});
+			model = models[0];
+		}
+		if (!model) {
+			throw new Error('Language model unavailable');
 		}
 
 		return model;

@@ -87,7 +87,7 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
 		@IChatEntitlementService private readonly chatEntitlementService: IChatEntitlementService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@ILogService private readonly logService: ILogService,
-		@IProductService productService: IProductService
+		@IProductService private readonly productService: IProductService
 	) {
 		super();
 		this.storageManager = this._register(new StorageManager(storageService));
@@ -153,6 +153,13 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
 
 	private ensureChatExtensionInitialDisabledState(): void {
 		if (!this._chatExtensionId || this.environmentService.isSessionsWindow || this.environmentService.skipBuiltinExtensions?.some(id => id.toLowerCase() === this._chatExtensionId)) {
+			return;
+		}
+
+		// LocalPointer (and other local-only products): never auto-disable the chat extension.
+		// Setup is not gated on GitHub auth, and the migration would otherwise leave chat unusable.
+		const providerId = this.productService.defaultChatAgent?.provider?.default?.id;
+		if (!providerId || providerId === 'none') {
 			return;
 		}
 
@@ -660,7 +667,15 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
 	}
 
 	private _isDisabledByUnification(identifier: IExtensionIdentifier): boolean {
-		return this._extensionUnificationEnabled && identifier.id.toLowerCase() === this._completionsExtensionId;
+		if (!this._extensionUnificationEnabled || !this._completionsExtensionId) {
+			return false;
+		}
+		// Copilot unification disables the separate completions extension once chat serves both.
+		// When extensionId and chatExtensionId are the same (LocalPointer), do not self-disable.
+		if (this._completionsExtensionId === this._chatExtensionId) {
+			return false;
+		}
+		return identifier.id.toLowerCase() === this._completionsExtensionId;
 	}
 
 	private _isDisabledBySessionsWindow(extension: IExtension): boolean {

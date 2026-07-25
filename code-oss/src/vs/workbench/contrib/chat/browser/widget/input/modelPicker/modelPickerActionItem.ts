@@ -17,6 +17,7 @@ import { localize } from '../../../../../../../nls.js';
 import { IContextKeyService } from '../../../../../../../platform/contextkey/common/contextkey.js';
 import { IInstantiationService } from '../../../../../../../platform/instantiation/common/instantiation.js';
 import { IKeybindingService } from '../../../../../../../platform/keybinding/common/keybinding.js';
+import product from '../../../../../../../platform/product/common/product.js';
 import { ILanguageModelChatMetadataAndIdentifier } from '../../../../common/languageModels.js';
 import { IChatInputPickerOptions } from '../chatInputPickerActionItem.js';
 import { ModelPickerWidget } from './modelPickerWidget.js';
@@ -189,6 +190,10 @@ export class ModelPickerActionItem extends BaseActionViewItem {
 			return localize('chat.modelPicker.restrictedHover', "{0} • Unavailable while in Restricted mode. Trust Workspace to enable models.", label);
 		}
 		if (this._pickerWidget.isSetupRequired()) {
+			const providerId = product.defaultChatAgent?.provider?.default?.id;
+			if (!providerId || providerId === 'none') {
+				return localize('chat.modelPicker.localModelsHover', "{0} • No Ollama models yet. Run ollama pull <model>.", label);
+			}
 			return localize('chat.modelPicker.setupRequiredHover', "{0} • Sign in to GitHub Copilot to choose a model.", label);
 		}
 		const { statusIcon, tooltip } = this._pickerWidget.selectedModel?.metadata || {};

@@ -23,6 +23,7 @@ import { IActionListHeaderLink } from '../../../../../../../platform/actionWidge
 import { IActionWidgetService } from '../../../../../../../platform/actionWidget/browser/actionWidget.js';
 import { IActionWidgetDropdownAction } from '../../../../../../../platform/actionWidget/browser/actionWidgetDropdown.js';
 import { ICommandService } from '../../../../../../../platform/commands/common/commands.js';
+import product from '../../../../../../../platform/product/common/product.js';
 import { IOpenerService } from '../../../../../../../platform/opener/common/opener.js';
 import { IProductService } from '../../../../../../../platform/product/common/productService.js';
 import { ITelemetryService } from '../../../../../../../platform/telemetry/common/telemetry.js';
@@ -622,7 +623,9 @@ export class ModelPickerWidget extends Disposable {
 		const ariaLabel = restrictedMode
 			? localize('chat.modelPicker.ariaLabelRestricted', "Models, unavailable while in Restricted mode")
 			: setupRequired
-				? localize('chat.modelPicker.ariaLabelSetupRequired', "Models, sign in to use Copilot")
+				? ((!product.defaultChatAgent?.provider?.default?.id || product.defaultChatAgent.provider.default.id === 'none')
+					? localize('chat.modelPicker.ariaLabelLocalModels', "Models, no Ollama models yet")
+					: localize('chat.modelPicker.ariaLabelSetupRequired', "Models, sign in to use Copilot"))
 				: localize('chat.modelPicker.ariaLabel', "Models, {0}", modelLabel);
 		this._domNode.ariaLabel = ariaLabel;
 		this._nameButton.ariaLabel = ariaLabel;

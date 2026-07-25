@@ -16,7 +16,13 @@ Implemented Cursor-like capabilities on a Code-OSS fork, powered only by local O
 | Model picker | Status bar / command | Ollama `/api/tags` |
 | Why panel | Command: LocalPointer: Show Why | Tokens / tools / timing |
 | Approvals | Allow/Deny on mutating tools | Daemon + UI prompts |
-| Local-only | Defaults to loopback | No cloud LLM APIs |
+| Local-only | Defaults to loopback | No Copilot, no cloud LLM APIs |
+
+## Explicitly removed / disabled
+
+- Built-in `extensions/copilot` (GitHub Copilot Chat) deleted from the tree
+- `product.json` `defaultChatAgent`, Copilot entitlement URLs, and Microsoft voice WS URL removed
+- `chat.agentHost.enabled` defaults to **false** (no Agent Host Copilot CLI)
 
 ## Daemon tools (agent)
 

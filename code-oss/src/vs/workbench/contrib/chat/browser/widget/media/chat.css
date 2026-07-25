@@ -1801,6 +1801,33 @@ have to be updated for changes to the rules above, or to support more deeply nes
 		height: auto;
 	}
 
+	/* Run everything: real checkbox toggle, not a toolbar button chip */
+	.monaco-action-bar .action-item.checkbox-action-item {
+		gap: 4px;
+		padding: 2px 4px;
+		border-radius: 3px;
+		background: transparent !important;
+		border: none;
+		cursor: pointer;
+	}
+
+	.monaco-action-bar .action-item.checkbox-action-item:hover {
+		background: transparent !important;
+	}
+
+	.monaco-action-bar .action-item.checkbox-action-item > .checkbox-label {
+		color: var(--vscode-descriptionForeground);
+		font-size: 12px;
+		padding: 0;
+		line-height: 16px;
+		white-space: nowrap;
+	}
+
+	.monaco-action-bar .action-item.checkbox-action-item > .monaco-custom-toggle.monaco-checkbox {
+		margin: 0;
+		flex-shrink: 0;
+	}
+
 	.chat-input-picker-item {
 		min-width: 0px;
 		overflow: hidden;

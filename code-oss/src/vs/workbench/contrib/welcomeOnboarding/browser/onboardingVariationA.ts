@@ -10,8 +10,8 @@ import { isCancellationError } from '../../../../base/common/errors.js';
 import { StopWatch } from '../../../../base/common/stopwatch.js';
 import { URI } from '../../../../base/common/uri.js';
 import { isWindows, isMacintosh, isLinux } from '../../../../base/common/platform.js';
-import { assertDefined } from '../../../../base/common/types.js';
 import { FileAccess } from '../../../../base/common/network.js';
+import { IDefaultChatAgent } from '../../../../base/common/product.js';
 import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
 import { KeyCode } from '../../../../base/common/keyCodes.js';
 import { StandardKeyboardEvent } from '../../../../base/browser/keyboardEvent.js';
@@ -77,8 +77,48 @@ type OnboardingActionEvent = {
 
 type EnterpriseSignInUiState = 'options' | 'instance' | 'progress';
 
-assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');
-const defaultChat = product.defaultChatAgent;
+// LocalPointer: no GitHub Copilot product config. Use an inert stub so this
+// module can load; Copilot sign-in UI is never shown without a real agent.
+const emptyChatAgent: IDefaultChatAgent = {
+	extensionId: 'localpointer.localpointer-ai',
+	chatExtensionId: 'localpointer.localpointer-ai',
+	chatExtensionOutputId: '',
+	chatExtensionOutputExtensionStateCommand: '',
+	documentationUrl: '',
+	skusDocumentationUrl: '',
+	optimizeUsageDocumentationUrl: '',
+	publicCodeMatchesUrl: '',
+	managePlanUrl: '',
+	upgradePlanUrl: '',
+	signUpUrl: '',
+	termsStatementUrl: '',
+	privacyStatementUrl: '',
+	provider: {
+		default: { id: 'none', name: 'LocalPointer' },
+		enterprise: { id: 'none', name: 'None' },
+		google: { id: 'none', name: 'None' },
+		apple: { id: 'none', name: 'None' },
+	},
+	providerExtensionId: '',
+	providerUriSetting: '',
+	providerScopes: [[]],
+	entitlementUrl: '',
+	entitlementSignupLimitedUrl: '',
+	tokenEntitlementUrl: '',
+	mcpRegistryDataUrl: '',
+	managedSettingsUrl: '',
+	chatQuotaExceededContext: '',
+	completionsQuotaExceededContext: '',
+	walkthroughCommand: '',
+	completionsMenuCommand: '',
+	chatRefreshTokenCommand: '',
+	generateCommitMessageCommand: '',
+	resolveMergeConflictsCommand: '',
+	completionsAdvancedSetting: '',
+	completionsEnablementSetting: '',
+	nextEditSuggestionsSetting: '',
+};
+const defaultChat = product.defaultChatAgent ?? emptyChatAgent;
 
 /**
  * Variation A — Classic Wizard Modal

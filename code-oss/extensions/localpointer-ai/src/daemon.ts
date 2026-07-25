@@ -33,6 +33,12 @@ export interface DaemonSSEEvent {
 	id?: string;
 	tool?: string;
 	args?: Record<string, unknown>;
+	/** Truncated tool result text (tool_result). */
+	content?: string;
+	kind?: string;
+	data?: unknown;
+	path?: string;
+	auto?: boolean;
 }
 
 export interface DaemonInlineEditRequest {

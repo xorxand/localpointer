@@ -526,6 +526,9 @@ func (s *Server) runAgent(
 			if result.Data != nil {
 				event["data"] = result.Data
 			}
+			if result.Content != "" {
+				event["content"] = truncateForUI(result.Content, 2400)
+			}
 			_ = writeSSE(event)
 
 			// Notify UI to refresh explorer/editor when files change.
@@ -557,6 +560,13 @@ func summarizeToolArgsForUI(args map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+func truncateForUI(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }
 
 func streamTextChunks(ctx context.Context, text string, onToken func(string) error) error {

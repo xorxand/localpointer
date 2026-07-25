@@ -125,11 +125,11 @@ function getPermissionLevelMeta(level: ChatPermissionLevel): IPermissionLevelMet
 		default:
 			return {
 				id: 'chat.permissions.default',
-				label: localize('permissions.default', "Default approvals"),
-				shortLabel: localize('permissions.default.label', "Default approvals"),
-				detail: localize('permissions.default.subtext', "Asks when approval settings don't apply"),
+				label: localize('permissions.default', "Ask"),
+				shortLabel: localize('permissions.default.label', "Ask"),
+				detail: localize('permissions.default.subtext', "Ask before running tools"),
 				icon: ThemeIcon.fromId(Codicon.shield.id),
-				description: localize('permissions.default.description', "Use configured approval settings"),
+				description: localize('permissions.default.description', "Ask for approval before each tool that needs it"),
 				elevated: false,
 			};
 	}
@@ -321,7 +321,7 @@ export class PermissionPickerActionItem extends ChatInputPickerActionViewItem {
 			label = meta.shortLabel;
 			tooltip = this.delegate.getPermissionLevelHover?.(level, meta) ?? meta.description;
 			if (level === ChatPermissionLevel.Default && this.isSandboxToggleAvailable() && this.isSandboxingEnabled()) {
-				label = localize('permissions.defaultSandboxed.label', "Default approvals (sandboxed)");
+				label = localize('permissions.defaultSandboxed.label', "Ask (sandboxed)");
 			}
 		}
 
