@@ -1,0 +1,35 @@
+# LocalPointer
+daemon/localpointer-daemon
+daemon/daemon.log
+daemon/daemon.pid
+daemon/data/
+daemon/workspace/
+data/
+workspace/
+*.db
+*.db-shm
+*.db-wal
+
+# Build / launch logs
+npm-install.log
+compile-*.log
+launch-*.log
+prelaunch.log
+
+# Code-OSS build artifacts (keep sources; ignore heavy outputs)
+code-oss/node_modules/
+code-oss/out/
+code-oss/out-build/
+code-oss/out-vscode/
+code-oss/.build/
+code-oss/extensions/**/out/
+code-oss/extensions/**/dist/
+code-oss/extensions/**/node_modules/
+code-oss/extensions/copilot/node_modules/
+code-oss/extensions/localpointer-ai/bin/localpointer-daemon
+code-oss/**/*.js.map
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/

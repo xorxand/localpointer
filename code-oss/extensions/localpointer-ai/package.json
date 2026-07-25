@@ -1,0 +1,193 @@
+{
+  "name": "localpointer-ai",
+  "publisher": "localpointer",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.1.0",
+  "license": "MIT",
+  "icon": "media/icon.svg",
+  "engines": {
+    "vscode": "^1.131.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": false,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "enabledApiProposals": [
+    "chatParticipantAdditions",
+    "defaultChatParticipant"
+  ],
+  "main": "./out/extension",
+  "scripts": {
+    "compile": "gulp compile-extension:localpointer-ai",
+    "watch": "gulp watch-extension:localpointer-ai"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "localpointer",
+          "title": "%viewContainer.title%",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "localpointer": [
+        {
+          "type": "webview",
+          "id": "localpointer.chatView",
+          "name": "%chatView.title%"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "localpointer.openChat",
+        "title": "%command.openChat%",
+        "category": "%command.category%",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "localpointer.inlineEdit",
+        "title": "%command.inlineEdit%",
+        "category": "%command.category%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "localpointer.agentEdit",
+        "title": "%command.agentEdit%",
+        "category": "%command.category%",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "localpointer.toggleCompletions",
+        "title": "%command.toggleCompletions%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "localpointer.selectModel",
+        "title": "%command.selectModel%",
+        "category": "%command.category%",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "localpointer.showWhy",
+        "title": "%command.showWhy%",
+        "category": "%command.category%",
+        "icon": "$(info)"
+      },
+      {
+        "command": "localpointer.applyLastEdit",
+        "title": "%command.applyLastEdit%",
+        "category": "%command.category%",
+        "icon": "$(check)"
+      },
+      {
+        "command": "localpointer.rejectLastEdit",
+        "title": "%command.rejectLastEdit%",
+        "category": "%command.category%",
+        "icon": "$(close)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "localpointer.openChat",
+        "key": "ctrl+l",
+        "mac": "cmd+l"
+      },
+      {
+        "command": "localpointer.inlineEdit",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "localpointer.agentEdit",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "localpointer.applyLastEdit",
+        "key": "ctrl+shift+y",
+        "mac": "cmd+shift+y",
+        "when": "localpointer.hasPendingEdit"
+      },
+      {
+        "command": "localpointer.rejectLastEdit",
+        "key": "ctrl+shift+n",
+        "mac": "cmd+shift+n",
+        "when": "localpointer.hasPendingEdit"
+      }
+    ],
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "localpointer.daemonUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:9477",
+          "description": "%config.daemonUrl%"
+        },
+        "localpointer.ollamaUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "%config.ollamaUrl%"
+        },
+        "localpointer.model": {
+          "type": "string",
+          "default": "",
+          "description": "%config.model%"
+        },
+        "localpointer.completions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.completions.enabled%"
+        },
+        "localpointer.completions.debounceMs": {
+          "type": "number",
+          "default": 400,
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "%config.completions.debounceMs%"
+        },
+        "localpointer.autoApprove": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.autoApprove%"
+        },
+        "localpointer.daemonPath": {
+          "type": "string",
+          "default": "",
+          "description": "%config.daemonPath%"
+        }
+      }
+    },
+    "languageModelChatProviders": [
+      {
+        "vendor": "localpointer",
+        "displayName": "LocalPointer (Ollama)"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "localpointer.agent",
+        "name": "localpointer",
+        "description": "Local agent with workspace tools",
+        "isDefault": true
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "24.x"
+  }
+}

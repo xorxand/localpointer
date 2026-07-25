@@ -1,0 +1,23 @@
+{
+	"displayName": "LocalPointer AI",
+	"description": "Local AI chat, inline edit, and completions via Ollama and the LocalPointer daemon.",
+	"viewContainer.title": "LocalPointer",
+	"chatView.title": "Chat",
+	"command.category": "LocalPointer",
+	"command.openChat": "Open Chat",
+	"command.inlineEdit": "Inline Edit Selection",
+	"command.agentEdit": "Agent Edit",
+	"command.toggleCompletions": "Toggle Inline Completions",
+	"command.selectModel": "Select Model",
+	"command.showWhy": "Show Transparency Panel",
+	"command.applyLastEdit": "Apply Last Edit",
+	"command.rejectLastEdit": "Reject Last Edit",
+	"config.title": "LocalPointer AI",
+	"config.daemonUrl": "Base URL for the LocalPointer Go daemon.",
+	"config.ollamaUrl": "Base URL for the local Ollama server.",
+	"config.model": "Default Ollama model name. Empty means auto-select the first available model.",
+	"config.completions.enabled": "Enable inline code completions from local models.",
+	"config.completions.debounceMs": "Debounce delay in milliseconds before requesting completions.",
+	"config.autoApprove": "Automatically approve agent tool actions without prompting.",
+	"config.daemonPath": "Path to the localpointer-daemon binary. Empty searches next to the extension and PATH."
+}
