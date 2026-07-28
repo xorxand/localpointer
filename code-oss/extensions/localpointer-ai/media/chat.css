@@ -39,6 +39,10 @@ body {
   color: var(--muted);
   white-space: nowrap;
 }
+.controls .approval-mode select {
+  flex: none;
+  min-width: 128px;
+}
 .approval-mode.hidden { display: none; }
 .approval-card {
   margin-bottom: 12px;
@@ -150,6 +154,8 @@ select {
 }
 .msg.user { border-color: var(--accent); }
 .msg.assistant { background: rgba(127,127,127,0.08); }
+.msg .tool-activity:first-of-type { margin-top: 0; }
+.message-content:empty { display: none; }
 .msg.error { border-color: var(--err); color: var(--err); }
 .role {
   font-size: 11px;

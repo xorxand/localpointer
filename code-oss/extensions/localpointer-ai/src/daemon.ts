@@ -30,6 +30,7 @@ export interface DaemonSSEEvent {
 	model?: string;
 	stats?: Record<string, unknown>;
 	trace?: unknown[];
+	steps?: unknown[];
 	id?: string;
 	tool?: string;
 	args?: Record<string, unknown>;

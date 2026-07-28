@@ -38,7 +38,7 @@
 
   function setRunEverythingChecked(on) {
     if (runEverythingEl) {
-      runEverythingEl.checked = !!on;
+      runEverythingEl.value = on ? 'allowAll' : 'ask';
     }
   }
 
@@ -206,7 +206,29 @@
       const isErr = m.role === 'assistant' && String(m.content).startsWith('Error:');
       div.className = 'msg ' + m.role + (isErr ? ' error' : '');
       div.innerHTML =
-        '<div class="role">' + escapeHtml(m.role) + '</div>' + escapeHtml(m.content);
+        '<div class="role">' + escapeHtml(m.role) + '</div>';
+      if (m.activity && Array.isArray(m.activity.entries) && m.activity.entries.length) {
+        const details = document.createElement('details');
+        details.className = 'tool-activity';
+        const summary = document.createElement('summary');
+        summary.className = 'tool-activity-summary';
+        summary.textContent = m.activity.summary || 'Activity';
+        const activityBody = document.createElement('div');
+        activityBody.className = 'tool-activity-body';
+        for (const entry of m.activity.entries) {
+          const block = document.createElement('div');
+          block.className = 'tool-activity-entry';
+          block.textContent = String(entry).replace(/\n+$/, '');
+          activityBody.appendChild(block);
+        }
+        details.appendChild(summary);
+        details.appendChild(activityBody);
+        div.appendChild(details);
+      }
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      content.textContent = m.content;
+      div.appendChild(content);
       messagesEl.appendChild(div);
     }
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -318,7 +340,7 @@
   refreshBtn.addEventListener('click', () => vscode.postMessage({ type: 'refreshModels' }));
   clearBtn.addEventListener('click', () => vscode.postMessage({ type: 'clear' }));
 
-  // Enter = send; Ctrl+Enter or Shift+Enter = newline
+  // Enter = send; Shift+Enter = newline. Ctrl/Cmd+Enter also inserts a newline.
   inputEl.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.keyCode !== 13) {
       return;
@@ -358,7 +380,7 @@
     runEverythingEl.addEventListener('change', () => {
       vscode.postMessage({
         type: 'setApprovalMode',
-        mode: runEverythingEl.checked ? 'allowAll' : 'ask',
+        mode: runEverythingEl.value === 'allowAll' ? 'allowAll' : 'ask',
       });
     });
   }

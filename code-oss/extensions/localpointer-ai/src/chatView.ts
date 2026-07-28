@@ -14,6 +14,10 @@ import { ToolActivityCollector } from './toolActivity';
 interface ChatMessage {
 	role: 'user' | 'assistant' | 'system';
 	content: string;
+	activity?: {
+		summary: string;
+		entries: string[];
+	};
 }
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -255,6 +259,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		let assistant = '';
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
+		let assistantActivity: { summary: string; entries: string[] } | undefined;
 
 		try {
 			const ollamaOk = await this.ollama().health();
@@ -266,11 +271,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			}
 
 			if (this.agentMode) {
-				const result = await this.agentChat(prompt, model);
+			const result = await this.agentChat(prompt, model);
 				assistant = result.content;
 				stats = result.stats;
 				trace = result.trace;
 				this.conversationId = result.conversationId ?? this.conversationId;
+				if (result.activity?.entries.length) {
+					assistantActivity = result.activity;
+				}
 			} else {
 				const history = this.messages
 					.filter(m => m.role === 'user' || m.role === 'assistant')
@@ -322,7 +330,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		this.messages.push({ role: 'assistant', content: assistant });
+		this.messages.push({ role: 'assistant', content: assistant, activity: assistantActivity });
 		setLastTransparency({ model, stats, trace, source: 'chatView' });
 		this.postMessage({ type: 'messages', messages: this.messages });
 		this.postMessage({ type: 'streaming', active: false });
@@ -337,7 +345,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private async agentChat(
 		prompt: string,
 		model: string,
-	): Promise<{ content: string; stats?: Record<string, unknown>; trace?: unknown[]; conversationId?: number }> {
+	): Promise<{
+		content: string;
+		stats?: Record<string, unknown>;
+		trace?: unknown[];
+		conversationId?: number;
+		activity?: { summary: string; entries: string[] };
+	}> {
 		const daemon = await this.daemonManager.ensureRunning();
 		const wsPath = workspaceFolderPath();
 		const healthy = (await daemon.health()).ok;
@@ -417,9 +431,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						);
 						this.postMessage({ type: 'approvalMode', mode: 'allowAll' });
 						this.postStatus('Tools: Run everything on');
+						const modeActivity = tools.addNote('Run everything enabled — further tools will not ask');
 						this.postMessage({
 							type: 'toolActivity',
-							text: '*Run everything on — further tools will not ask*\n\n',
+							text: modeActivity.text,
 							summary: tools.summaryLabel(),
 							toolCount: tools.count,
 						});
@@ -432,7 +447,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			}
 		});
 
-		return { content, stats, trace, conversationId };
+		return {
+			content,
+			stats,
+			trace,
+			conversationId,
+			activity: {
+				summary: tools.summaryLabel(),
+				entries: [...tools.entries],
+			},
+		};
 	}
 
 	private selectModel(model: string): void {
@@ -512,8 +536,12 @@ ${css}
 </div>
 <div class="controls">
   <label><input type="checkbox" id="agent" /> Agent tools</label>
-  <label class="approval-mode" id="approvalModeWrap" title="When on, tools run without asking">
-    <input type="checkbox" id="runEverything" /> Run everything
+  <label class="approval-mode" id="approvalModeWrap">
+    Tool execution
+    <select id="runEverything" aria-label="Tool execution mode">
+      <option value="ask">Ask each time</option>
+      <option value="allowAll">Run everything</option>
+    </select>
   </label>
   <label><input type="checkbox" id="why" /> Why / stats</label>
   <button type="button" class="secondary" id="clear">Clear</button>

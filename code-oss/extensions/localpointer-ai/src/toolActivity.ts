@@ -19,23 +19,48 @@ export interface ToolActivityEntry {
  */
 export class ToolActivityCollector {
 	private toolCount = 0;
+	private readonly activityEntries: string[] = [];
 
 	get count(): number {
 		return this.toolCount;
 	}
 
+	get entries(): readonly string[] {
+		return this.activityEntries;
+	}
+
+	addNote(text: string): ToolActivityEntry {
+		const activity = {
+			text: `${text.replace(/\n+$/, '')}\n\n`,
+			toolCount: this.toolCount,
+		};
+		this.activityEntries.push(activity.text);
+		return activity;
+	}
+
 	summaryLabel(): string {
 		if (this.toolCount <= 0) {
-			return 'Tools';
+			return 'Activity';
 		}
-		return this.toolCount === 1 ? '1 tool' : `${this.toolCount} tools`;
+		return this.toolCount === 1 ? 'Activity · 1 tool call' : `Activity · ${this.toolCount} tool calls`;
 	}
 
 	/**
 	 * Returns an activity entry when the event is tool-related, otherwise undefined.
 	 */
 	consume(event: DaemonSSEEvent): ToolActivityEntry | undefined {
+		let activity: ToolActivityEntry | undefined;
 		switch (event.status) {
+			case 'plan': {
+				const steps = Array.isArray(event.steps)
+					? event.steps.map((step, index) => `${index + 1}. ${String(step)}`).join('\n')
+					: '';
+				activity = {
+					text: steps ? `Plan\n${steps}\n\n` : 'Plan created\n\n',
+					toolCount: this.toolCount,
+				};
+				break;
+			}
 			case 'tool_call': {
 				this.toolCount++;
 				const args = formatArgs(event.args);
@@ -44,41 +69,54 @@ export class ToolActivityCollector {
 					lines.push(args);
 				}
 				lines.push('');
-				return { text: lines.join('\n'), tool: event.tool, toolCount: this.toolCount };
+				activity = { text: lines.join('\n'), tool: event.tool, toolCount: this.toolCount };
+				break;
 			}
 			case 'approved': {
 				const how = event.auto ? 'auto-approved' : 'allowed';
-				return {
+				activity = {
 					text: `  (${how})\n`,
 					tool: event.tool,
 					toolCount: this.toolCount,
 				};
+				break;
 			}
 			case 'tool_result': {
 				const preview = formatResultPreview(event);
-				return {
+				activity = {
 					text: preview ? `← ${preview}\n\n` : `← (empty result)\n\n`,
 					tool: event.tool,
 					toolCount: this.toolCount,
 				};
+				break;
 			}
 			case 'tool_error': {
 				const err = event.error ?? 'unknown error';
-				return {
+				activity = {
 					text: `← error: ${err}\n\n`,
 					tool: event.tool,
 					toolCount: this.toolCount,
 				};
+				break;
 			}
 			case 'tool_denied':
-				return {
+				activity = {
 					text: `  (denied)\n\n`,
 					tool: event.tool,
 					toolCount: this.toolCount,
 				};
+				break;
+			case 'file_changed':
+				activity = {
+					text: `Changed ${event.path ?? 'workspace file'}\n\n`,
+					toolCount: this.toolCount,
+				};
+				break;
 			default:
 				return undefined;
 		}
+		this.activityEntries.push(activity.text);
+		return activity;
 	}
 }
 
