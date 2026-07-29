@@ -36,6 +36,7 @@ type ollamaChatRequest struct {
 	Model    string           `json:"model"`
 	Messages []map[string]any `json:"messages"`
 	Stream   bool             `json:"stream"`
+	Think    any              `json:"think,omitempty"`
 	Tools    []map[string]any `json:"tools,omitempty"`
 	Format   any              `json:"format,omitempty"`
 	Options  map[string]any   `json:"options,omitempty"`
@@ -53,6 +54,7 @@ func buildOptions(temperature float64) map[string]any {
 type ollamaChatChunk struct {
 	Message struct {
 		Content   string           `json:"content"`
+		Thinking  string           `json:"thinking"`
 		ToolCalls []ollamaToolCall `json:"tool_calls"`
 	} `json:"message"`
 	Done            bool  `json:"done"`
@@ -100,6 +102,7 @@ func statsFromChunk(chunk ollamaChatChunk) ChatStats {
 
 type OllamaToolChatResponse struct {
 	Content   string
+	Thinking  string
 	ToolCalls []ollamaToolCall
 	Stats     ChatStats
 }
@@ -330,6 +333,7 @@ func (c *OllamaClient) ChatWithTools(ctx context.Context, model string, messages
 		Model:    model,
 		Messages: messages,
 		Stream:   false,
+		Think:    true,
 		Tools:    tools,
 		Options:  options,
 	})
@@ -361,6 +365,7 @@ func (c *OllamaClient) ChatWithTools(ctx context.Context, model string, messages
 
 	return OllamaToolChatResponse{
 		Content:   chunk.Message.Content,
+		Thinking:  chunk.Message.Thinking,
 		ToolCalls: chunk.Message.ToolCalls,
 		Stats:     statsFromChunk(chunk),
 	}, nil
@@ -510,11 +515,19 @@ func (c *OllamaClient) ChatJSON(ctx context.Context, model string, messages []ma
 	return chunk.Message.Content, nil
 }
 
-func (c *OllamaClient) StreamChat(ctx context.Context, model string, messages []map[string]any, options map[string]any, onToken func(string) error) (string, ChatStats, error) {
+func (c *OllamaClient) StreamChat(
+	ctx context.Context,
+	model string,
+	messages []map[string]any,
+	options map[string]any,
+	onToken func(string) error,
+	onThinking func(string) error,
+) (string, ChatStats, error) {
 	payload, err := json.Marshal(ollamaChatRequest{
 		Model:    model,
 		Messages: messages,
 		Stream:   true,
+		Think:    true,
 		Options:  options,
 	})
 	if err != nil {
@@ -564,6 +577,11 @@ func (c *OllamaClient) StreamChat(ctx context.Context, model string, messages []
 				if err := onToken(chunk.Message.Content); err != nil {
 					return fullResponse, stats, err
 				}
+			}
+		}
+		if chunk.Message.Thinking != "" && onThinking != nil {
+			if err := onThinking(chunk.Message.Thinking); err != nil {
+				return fullResponse, stats, err
 			}
 		}
 		if chunk.Done {

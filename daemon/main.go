@@ -288,7 +288,7 @@ func (s *Server) handleComplete(w http.ResponseWriter, r *http.Request) {
 		{"role": "system", "content": system},
 		{"role": "user", "content": user},
 	}
-	out, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2, "num_predict": 128}, nil)
+	out, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2, "num_predict": 128}, nil, nil)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 		return
@@ -342,7 +342,7 @@ func (s *Server) handleInlineEdit(w http.ResponseWriter, r *http.Request) {
 	// Prefer JSON for IDE clients unless they explicitly ask for SSE.
 	wantStream := r.URL.Query().Get("stream") == "1" || strings.Contains(r.Header.Get("Accept"), "text/event-stream")
 	if !wantStream {
-		text, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2}, nil)
+		text, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2}, nil, nil)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return
@@ -353,7 +353,7 @@ func (s *Server) handleInlineEdit(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		text, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2}, nil)
+		text, stats, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2}, nil, nil)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 			return
@@ -383,7 +383,7 @@ func (s *Server) handleInlineEdit(w http.ResponseWriter, r *http.Request) {
 		text, st, err := s.ollama.StreamChat(r.Context(), model, messages, map[string]any{"temperature": 0.2}, func(tok string) error {
 			full.WriteString(tok)
 			return writeSSE(map[string]any{"token": tok})
-		})
+		}, nil)
 		if full.Len() == 0 {
 			full.WriteString(text)
 		}
@@ -977,7 +977,7 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"auto_approve": s.store.GetSetting("auto_approve", "false") == "true",
+		"auto_approve":  s.store.GetSetting("auto_approve", "false") == "true",
 		"default_model": s.store.GetSetting("default_model", ""),
 	})
 }

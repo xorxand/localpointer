@@ -7,11 +7,7 @@
   const sendBtn = document.getElementById('send');
   const refreshBtn = document.getElementById('refresh');
   const clearBtn = document.getElementById('clear');
-  const agentEl = document.getElementById('agent');
   const runEverythingEl = document.getElementById('runEverything');
-  const approvalModeWrap = document.getElementById('approvalModeWrap');
-  const whyEl = document.getElementById('why');
-  const whyPanel = document.getElementById('whyPanel');
   const statusEl = document.getElementById('status');
   const workingBanner = document.getElementById('workingBanner');
   const workingLabel = document.getElementById('workingLabel');
@@ -25,16 +21,7 @@
   let workStartedAt = 0;
   let workTimer = null;
   let pendingText = '';
-
-  function syncApprovalModeVisibility() {
-    if (!approvalModeWrap) {
-      return;
-    }
-    approvalModeWrap.classList.toggle('hidden', !agentEl.checked);
-    if (runEverythingEl) {
-      runEverythingEl.disabled = !agentEl.checked;
-    }
-  }
+  let thinkingBuf = '';
 
   function setRunEverythingChecked(on) {
     if (runEverythingEl) {
@@ -105,6 +92,27 @@
     return section;
   }
 
+  function ensureThinkingSection() {
+    let section = document.getElementById('thinkingActivity');
+    if (section) {
+      return section;
+    }
+    section = document.createElement('details');
+    section.className = 'thinking-activity';
+    section.id = 'thinkingActivity';
+    section.innerHTML =
+      '<summary>Thinking</summary>' +
+      '<div class="thinking-activity-body" id="thinkingActivityBody"></div>';
+    const stream = document.getElementById('stream');
+    const toolActivity = document.getElementById('toolActivity');
+    if (stream && toolActivity) {
+      stream.insertBefore(section, toolActivity);
+    } else if (stream) {
+      stream.insertBefore(section, document.getElementById('streamBody'));
+    }
+    return section;
+  }
+
   function appendToolActivity(msg) {
     const section = ensureToolActivitySection();
     const summary = section.querySelector('.tool-activity-summary');
@@ -130,6 +138,14 @@
     const body = document.getElementById('toolActivityBody');
     if (body) {
       body.removeAttribute('id');
+    }
+    const thinking = document.getElementById('thinkingActivity');
+    if (thinking) {
+      thinking.removeAttribute('id');
+    }
+    const thinkingBody = document.getElementById('thinkingActivityBody');
+    if (thinkingBody) {
+      thinkingBody.removeAttribute('id');
     }
   }
 
@@ -225,6 +241,18 @@
         details.appendChild(activityBody);
         div.appendChild(details);
       }
+      if (m.thinking) {
+        const details = document.createElement('details');
+        details.className = 'thinking-activity';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Thinking';
+        const thinkingBody = document.createElement('div');
+        thinkingBody.className = 'thinking-activity-body';
+        thinkingBody.textContent = m.thinking;
+        details.appendChild(summary);
+        details.appendChild(thinkingBody);
+        div.insertBefore(details, div.firstChild.nextSibling);
+      }
       const content = document.createElement('div');
       content.className = 'message-content';
       content.textContent = m.content;
@@ -252,7 +280,7 @@
           '"' +
           (m === selected ? ' selected' : '') +
           '>' +
-          escapeHtml(m) +
+          escapeHtml(String(m).toLowerCase() === 'auto' ? 'Auto' : m) +
           '</option>',
       )
       .join('');
@@ -270,6 +298,7 @@
     modelEl.disabled = active || modelEl.options.length === 0 || !modelEl.value;
     if (active) {
       streamBuf = '';
+      thinkingBuf = '';
       gotToken = false;
       const empty = messagesEl.querySelector('.empty');
       if (empty) {
@@ -371,11 +400,6 @@
     sendBtn.disabled = streaming || !modelEl.value;
   });
 
-  agentEl.addEventListener('change', () => {
-    syncApprovalModeVisibility();
-    vscode.postMessage({ type: 'toggleAgent', enabled: agentEl.checked });
-  });
-
   if (runEverythingEl) {
     runEverythingEl.addEventListener('change', () => {
       vscode.postMessage({
@@ -385,21 +409,12 @@
     });
   }
 
-  whyEl.addEventListener('change', () => {
-    whyPanel.classList.toggle('visible', whyEl.checked);
-    vscode.postMessage({ type: 'toggleWhy', enabled: whyEl.checked });
-  });
-
   window.addEventListener('message', (event) => {
     const msg = event.data || {};
     switch (msg.type) {
       case 'init':
         fillModels(msg.models, msg.model);
-        agentEl.checked = !!msg.agentMode;
         setRunEverythingChecked(msg.approvalMode === 'allowAll');
-        syncApprovalModeVisibility();
-        whyEl.checked = !!msg.showWhy;
-        whyPanel.classList.toggle('visible', !!msg.showWhy);
         renderMessages(msg.messages || []);
         if (msg.error) {
           setStatus(msg.error, true);
@@ -452,13 +467,26 @@
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
         break;
+      case 'thinkingToken': {
+        thinkingBuf += msg.token || '';
+        ensureThinkingSection();
+        const thinkingBody = document.getElementById('thinkingActivityBody');
+        if (thinkingBody) {
+          thinkingBody.textContent = thinkingBuf;
+        }
+        workingLabel.textContent = 'Thinking\u2026';
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        break;
+      }
+      case 'resolvedModel':
+        if (msg.model) {
+          workingLabel.textContent = 'Working with ' + msg.model + '\u2026';
+        }
+        break;
       case 'model':
         if (msg.model) {
           modelEl.value = msg.model;
         }
-        break;
-      case 'why':
-        whyPanel.textContent = msg.info ? JSON.stringify(msg.info, null, 2) : '';
         break;
       case 'status':
         setStatus(msg.text || '', /error/i.test(msg.text || ''));
@@ -482,6 +510,5 @@
     }
   });
 
-  syncApprovalModeVisibility();
   vscode.postMessage({ type: 'ready' });
 })();

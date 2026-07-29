@@ -7,13 +7,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DaemonManager } from './daemonManager';
 import { OllamaClient } from './ollama';
-import { getConfig, getLastTransparency, resolveModelName, setLastTransparency, workspaceFolderPath } from './config';
+import { getConfig, resolveRequestModel, setLastTransparency, workspaceFolderPath } from './config';
 import { DaemonSSEEvent } from './daemon';
 import { ToolActivityCollector } from './toolActivity';
+import { AUTO_MODEL_ID, isAutoModelId } from './autoRouter';
 
 interface ChatMessage {
 	role: 'user' | 'assistant' | 'system';
 	content: string;
+	thinking?: string;
 	activity?: {
 		summary: string;
 		entries: string[];
@@ -28,8 +30,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private readonly messages: ChatMessage[] = [];
 	/** Model selected for this chat panel (not necessarily the global setting). */
 	private selectedModel = '';
-	private agentMode = false;
-	private showWhy = false;
 	/** Mirrors Ask / Allow all control (synced with localpointer.autoApprove). */
 	private autoApproveTools = false;
 	private sending = false;
@@ -80,14 +80,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						break;
 					case 'selectModel':
 						this.selectModel(String(msg.model ?? ''));
-						break;
-					case 'toggleAgent':
-						this.agentMode = !!msg.enabled;
-						this.postStatus(this.agentMode ? 'Agent mode on (tools via local daemon)' : 'Chat mode (direct Ollama)');
-						break;
-					case 'toggleWhy':
-						this.showWhy = !!msg.enabled;
-						this.postWhy();
 						break;
 					case 'setApprovalMode': {
 						const allowAll = String(msg.mode ?? '') === 'allowAll';
@@ -184,12 +176,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			error = String(err);
 		}
 
+		const localModelCount = models.length;
+		models = [AUTO_MODEL_ID, ...models.filter(model => !isAutoModelId(model))];
 		if (!this.selectedModel || !models.includes(this.selectedModel)) {
-			try {
-				this.selectedModel = await resolveModelName(() => Promise.resolve(models), this.selectedModel || getConfig().model);
-			} catch {
-				this.selectedModel = models[0] ?? '';
-			}
+			const configured = getConfig().model.trim();
+			this.selectedModel = configured && models.includes(configured) ? configured : AUTO_MODEL_ID;
 		}
 
 		this.autoApproveTools = getConfig().autoApprove;
@@ -198,22 +189,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			type: 'init',
 			models,
 			model: this.selectedModel,
-			agentMode: this.agentMode,
 			approvalMode: this.autoApproveTools ? 'allowAll' : 'ask',
-			showWhy: this.showWhy,
 			messages: this.messages,
 			ollamaOk,
 			ollamaUrl: getConfig().ollamaUrl,
 			error,
 		});
-		this.postWhy();
-
 		if (!ollamaOk) {
 			this.postStatus(`Ollama unreachable at ${getConfig().ollamaUrl}`);
-		} else if (models.length === 0) {
+		} else if (localModelCount === 0) {
 			this.postStatus('No models found. Run: ollama pull qwen2.5:7b');
 		} else {
-			this.postStatus(`Ready · ${models.length} model(s) · ${this.selectedModel || 'none selected'}`);
+			this.postStatus(`Ready · ${localModelCount} local model(s)`);
 		}
 	}
 
@@ -255,8 +242,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		this.postMessage({ type: 'streaming', active: true, model: this.selectedModel });
 		this.postStatus(`Talking to ${this.selectedModel}…`);
 
-		const model = this.selectedModel;
+		let model = this.selectedModel;
 		let assistant = '';
+		let assistantThinking = '';
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
 		let assistantActivity: { summary: string; entries: string[] } | undefined;
@@ -270,9 +258,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				throw new Error('Cancelled');
 			}
 
-			if (this.agentMode) {
-			const result = await this.agentChat(prompt, model);
+			const resolved = await resolveRequestModel(this.ollama(), {
+				configured: this.selectedModel,
+				prompt,
+				signal,
+			});
+			model = resolved.model;
+			if (resolved.routedFromAuto) {
+				const note = `Auto selected ${model}${resolved.complexity ? ` for a ${resolved.complexity} request` : ''}.`;
+				assistantThinking += `${note}\n\n`;
+				this.postMessage({ type: 'thinkingToken', token: `${note}\n\n` });
+				this.postMessage({ type: 'resolvedModel', model });
+				this.postStatus(`Auto selected ${model}`);
+			}
+
+			if (workspaceFolderPath()) {
+				const result = await this.agentChat(prompt, model);
 				assistant = result.content;
+				assistantThinking += result.thinking ?? '';
 				stats = result.stats;
 				trace = result.trace;
 				this.conversationId = result.conversationId ?? this.conversationId;
@@ -302,6 +305,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 						this.postMessage({ type: 'streamToken', token });
 					},
 					signal,
+					token => {
+						if (gen !== this.sendGen) {
+							return;
+						}
+						assistantThinking += token;
+						this.postMessage({ type: 'thinkingToken', token });
+					},
 				);
 				assistant = result.content || assistant;
 				stats = {
@@ -330,11 +340,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		this.messages.push({ role: 'assistant', content: assistant, activity: assistantActivity });
+		this.messages.push({
+			role: 'assistant',
+			content: assistant,
+			thinking: assistantThinking.trim() || undefined,
+			activity: assistantActivity,
+		});
 		setLastTransparency({ model, stats, trace, source: 'chatView' });
 		this.postMessage({ type: 'messages', messages: this.messages });
 		this.postMessage({ type: 'streaming', active: false });
-		this.postWhy();
 		if (!assistant.startsWith('Error:') && assistant !== '(cancelled)') {
 			this.postStatus(`Done · ${model}`);
 		}
@@ -350,6 +364,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		stats?: Record<string, unknown>;
 		trace?: unknown[];
 		conversationId?: number;
+		thinking?: string;
 		activity?: { summary: string; entries: string[] };
 	}> {
 		const daemon = await this.daemonManager.ensureRunning();
@@ -370,8 +385,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				[...history, { role: 'user', content: prompt }],
 				token => this.postMessage({ type: 'streamToken', token }),
 				this.abort?.signal,
+				token => this.postMessage({ type: 'thinkingToken', token }),
 			);
-			return { content: result.content, stats: result.stats as Record<string, unknown> };
+			return {
+				content: result.content,
+				thinking: result.thinking,
+				stats: result.stats as Record<string, unknown>,
+			};
 		}
 
 		const workspaceId = await daemon.ensureWorkspace(wsPath);
@@ -379,6 +399,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
 		let conversationId: number | undefined;
+		let thinking = '';
 		const tools = new ToolActivityCollector();
 
 		await daemon.chat({
@@ -394,6 +415,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			if (event.token) {
 				content += event.token;
 				this.postMessage({ type: 'streamToken', token: event.token });
+			}
+			if (event.thinking) {
+				thinking += event.thinking;
+				this.postMessage({ type: 'thinkingToken', token: event.thinking });
 			}
 			if (event.stats) {
 				stats = event.stats;
@@ -449,6 +474,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
 		return {
 			content,
+			thinking,
 			stats,
 			trace,
 			conversationId,
@@ -492,14 +518,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		return [];
 	}
 
-	private postWhy(): void {
-		if (!this.showWhy) {
-			this.postMessage({ type: 'why', info: undefined });
-			return;
-		}
-		this.postMessage({ type: 'why', info: getLastTransparency() });
-	}
-
 	private postStatus(text: string): void {
 		this.postMessage({ type: 'status', text });
 	}
@@ -535,7 +553,6 @@ ${css}
   <button type="button" class="secondary" id="refresh" title="Reload models from Ollama">Refresh</button>
 </div>
 <div class="controls">
-  <label><input type="checkbox" id="agent" /> Agent tools</label>
   <label class="approval-mode" id="approvalModeWrap">
     Tool execution
     <select id="runEverything" aria-label="Tool execution mode">
@@ -543,11 +560,9 @@ ${css}
       <option value="allowAll">Run everything</option>
     </select>
   </label>
-  <label><input type="checkbox" id="why" /> Why / stats</label>
   <button type="button" class="secondary" id="clear">Clear</button>
 </div>
 <div class="messages" id="messages"><div class="empty">Loading models from Ollama\u2026</div></div>
-<div class="why-panel" id="whyPanel"></div>
 <div class="status" id="status"></div>
 <div class="working-banner" id="workingBanner" aria-live="polite">
   <div class="spinner" aria-hidden="true"></div>

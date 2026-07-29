@@ -11,6 +11,7 @@ import { DaemonSSEEvent } from './daemon';
 import { ToolActivityCollector } from './toolActivity';
 
 const TOOL_THINKING_ID = 'localpointer-tools';
+const MODEL_THINKING_ID = 'localpointer-thinking';
 
 export class ChatParticipantService implements vscode.Disposable {
 	private participant: vscode.ChatParticipant | undefined;
@@ -28,7 +29,7 @@ export class ChatParticipantService implements vscode.Disposable {
 			let model = '';
 			try {
 				const resolved = await resolveRequestModel(this.ollama, {
-					configured: cfg.model,
+					configured: request.model.id || cfg.model,
 					prompt: request.prompt,
 				});
 				model = resolved.model;
@@ -131,7 +132,13 @@ export class ChatParticipantService implements vscode.Disposable {
 		await this.ollama.streamChat(model, [{ role: 'user', content: prompt }], async token => {
 			onToken(token);
 			stream.markdown(token);
-		}, signal);
+		}, signal, token => {
+			stream.thinkingProgress({
+				id: MODEL_THINKING_ID,
+				text: token,
+				metadata: { title: 'Thinking' },
+			});
+		});
 	}
 
 	dispose(): void {
@@ -206,6 +213,13 @@ async function handleDaemonEvent(
 ): Promise<void> {
 	if (event.token) {
 		stream.markdown(event.token);
+	}
+	if (event.thinking) {
+		stream.thinkingProgress({
+			id: MODEL_THINKING_ID,
+			text: event.thinking,
+			metadata: { title: 'Thinking' },
+		});
 	}
 
 	emitToolActivity(stream, tools, event);

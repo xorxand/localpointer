@@ -106,9 +106,9 @@ func toolDefinition(name string) map[string]any {
 	case "grep":
 		return fn("grep", "Search files for a substring. Returns path:line:content matches.",
 			reqProps("query"), map[string]any{
-				"query":           prop("string", "Text to search for"),
-				"path":            prop("string", "Subdirectory to search (default: workspace root)"),
-				"case_sensitive":  prop("boolean", "Case-sensitive search (default false)"),
+				"query":          prop("string", "Text to search for"),
+				"path":           prop("string", "Subdirectory to search (default: workspace root)"),
+				"case_sensitive": prop("boolean", "Case-sensitive search (default false)"),
 			})
 	case "run_terminal":
 		return fn("run_terminal", "Run a bash command in the workspace root. Prefer non-interactive commands.",
@@ -158,7 +158,7 @@ func fn(name, desc string, required []string, props map[string]any) map[string]a
 		"function": map[string]any{
 			"name":        name,
 			"description": desc,
-			"parameters":   params,
+			"parameters":  params,
 		},
 	}
 }
@@ -429,7 +429,10 @@ func (s *Server) runAgent(
 	tools := allToolDefs()
 	supports, err := s.ollama.ModelSupportsTools(model)
 	if err != nil || !supports {
-		content, stats, err := s.ollama.StreamChat(ctx, model, messages, options, onToken)
+		onThinking := func(text string) error {
+			return writeSSE(map[string]any{"status": "thinking", "thinking": text})
+		}
+		content, stats, err := s.ollama.StreamChat(ctx, model, messages, options, onToken, onThinking)
 		return agentResult{Content: content, Stats: stats}, err
 	}
 
@@ -457,6 +460,9 @@ func (s *Server) runAgent(
 			return agentResult{}, err
 		}
 		stats.Add(resp.Stats)
+		if strings.TrimSpace(resp.Thinking) != "" {
+			_ = writeSSE(map[string]any{"status": "thinking", "thinking": resp.Thinking + "\n\n"})
+		}
 
 		if len(resp.ToolCalls) == 0 {
 			if strings.TrimSpace(resp.Content) == "" {
@@ -471,6 +477,7 @@ func (s *Server) runAgent(
 		working = append(working, map[string]any{
 			"role":       "assistant",
 			"content":    resp.Content,
+			"thinking":   resp.Thinking,
 			"tool_calls": toolCallsForMessage(resp.ToolCalls),
 		})
 

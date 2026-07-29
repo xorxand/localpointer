@@ -24,6 +24,7 @@ export interface DaemonChatRequest {
 export interface DaemonSSEEvent {
 	status?: string;
 	token?: string;
+	thinking?: string;
 	error?: string;
 	done?: boolean;
 	conversation_id?: number;

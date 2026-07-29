@@ -43,7 +43,6 @@ body {
   flex: none;
   min-width: 128px;
 }
-.approval-mode.hidden { display: none; }
 .approval-card {
   margin-bottom: 12px;
   padding: 10px;
@@ -128,6 +127,39 @@ body {
 .tool-activity-entry + .tool-activity-entry {
   border-top: 1px dashed var(--border);
   padding-top: 8px;
+}
+.thinking-activity {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.04);
+}
+.thinking-activity > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  user-select: none;
+}
+.thinking-activity > summary::-webkit-details-marker { display: none; }
+.thinking-activity > summary::before {
+  content: '\25B8';
+  display: inline-block;
+  width: 1em;
+  margin-right: 4px;
+}
+.thinking-activity[open] > summary::before { content: '\25BE'; }
+.thinking-activity-body {
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 select, textarea, button { font: inherit; }
 select {

@@ -28,7 +28,7 @@ interface OllamaTagsResponse {
 
 interface OllamaChatChunk {
 	model?: string;
-	message?: { role?: string; content?: string };
+	message?: { role?: string; content?: string; thinking?: string };
 	done?: boolean;
 	total_duration?: number;
 	load_duration?: number;
@@ -81,11 +81,12 @@ export class OllamaClient {
 		messages: OllamaMessage[],
 		onToken: (token: string) => void | Promise<void>,
 		signal?: AbortSignal,
-	): Promise<{ content: string; stats: OllamaChatStats }> {
+		onThinking?: (token: string) => void | Promise<void>,
+	): Promise<{ content: string; thinking: string; stats: OllamaChatStats }> {
 		const resp = await fetch(`${this.baseUrl}/api/chat`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ model, messages, stream: true }),
+			body: JSON.stringify({ model, messages, stream: true, think: true }),
 			signal,
 		});
 		if (!resp.ok) {
@@ -100,6 +101,7 @@ export class OllamaClient {
 		const decoder = new TextDecoder();
 		let buffer = '';
 		let full = '';
+		let thinking = '';
 		const stats: OllamaChatStats = {};
 
 		while (true) {
@@ -123,6 +125,11 @@ export class OllamaClient {
 					continue;
 				}
 				const token = chunk.message?.content ?? '';
+				const thinkingToken = chunk.message?.thinking ?? '';
+				if (thinkingToken) {
+					thinking += thinkingToken;
+					await onThinking?.(thinkingToken);
+				}
 				if (token) {
 					full += token;
 					await onToken(token);
@@ -136,7 +143,7 @@ export class OllamaClient {
 			}
 		}
 
-		return { content: full, stats };
+		return { content: full, thinking, stats };
 	}
 
 	async complete(model: string, prefix: string, suffix: string, languageId: string): Promise<string> {
