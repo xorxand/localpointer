@@ -53,17 +53,27 @@ func (w *WorkspaceFS) resolve(rel string) (string, error) {
 	if rel == "" {
 		rel = "."
 	}
-	rel = filepath.FromSlash(strings.TrimPrefix(filepath.ToSlash(rel), "/"))
+	rel = filepath.FromSlash(rel)
+	rootAbs, err := filepath.Abs(w.root)
+	if err != nil {
+		return "", err
+	}
+	if filepath.IsAbs(rel) {
+		absolute := filepath.Clean(rel)
+		if !pathWithinRoot(absolute, rootAbs) {
+			return "", fmt.Errorf("absolute path %q is outside workspace %q", absolute, rootAbs)
+		}
+		rel, err = filepath.Rel(rootAbs, absolute)
+		if err != nil {
+			return "", err
+		}
+	}
 	clean := filepath.Clean(rel)
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("path escapes workspace")
 	}
 
-	abs, err := filepath.Abs(filepath.Join(w.root, clean))
-	if err != nil {
-		return "", err
-	}
-	rootAbs, err := filepath.Abs(w.root)
+	abs, err := filepath.Abs(filepath.Join(rootAbs, clean))
 	if err != nil {
 		return "", err
 	}

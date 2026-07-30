@@ -21,7 +21,9 @@ Guidelines:
 - Keep changes minimal and focused on the user's request.
 - Use run_terminal for builds, tests, and inspection. Prefer non-interactive commands.
 - Use git_status, git_diff, git_log, and git_commit for version control. Never force-push or rewrite published history unless asked.
-- Paths are relative to the workspace root.
+- Tool paths are relative to the workspace root. For example, use "README.md" or "." — never "/home/user/project/README.md".
+- Stay inside the workspace. Do not inspect unrelated system files, credentials, home directories, or network resources.
+- Use only the tools needed to answer the request. If a tool fails repeatedly, stop trying variants and explain the limitation.
 - After tool results, continue until the task is done, then give a concise summary of what you changed.
 - Do not invent file contents — read them first.
 - You only have access to local Ollama models listed by the host. Never suggest calling OpenAI, Anthropic, or other cloud APIs.`
@@ -439,6 +441,7 @@ func (s *Server) runAgent(
 	executor := &toolExecutor{fs: fs, git: newGitRepo(fs.Root())}
 	var trace []traceEntry
 	var stats ChatStats
+	toolFailures := 0
 	working := append([]map[string]any(nil), messages...)
 
 	if plan {
@@ -451,6 +454,7 @@ func (s *Server) runAgent(
 		}
 	}
 
+toolLoop:
 	for round := 0; round < maxToolRounds; round++ {
 		if err := ctx.Err(); err != nil {
 			return agentResult{}, err
@@ -466,7 +470,7 @@ func (s *Server) runAgent(
 
 		if len(resp.ToolCalls) == 0 {
 			if strings.TrimSpace(resp.Content) == "" {
-				return agentResult{}, fmt.Errorf("model returned an empty response")
+				break toolLoop
 			}
 			if err := streamTextChunks(ctx, resp.Content, onToken); err != nil {
 				return agentResult{Content: resp.Content, Trace: trace, Stats: stats}, err
@@ -484,9 +488,13 @@ func (s *Server) runAgent(
 		for _, call := range resp.ToolCalls {
 			args, err := parseToolArguments(call.Function.Arguments)
 			if err != nil {
+				toolFailures++
 				errMsg := fmt.Sprintf("invalid tool arguments: %v", err)
 				_ = writeSSE(map[string]any{"status": "tool_error", "tool": call.Function.Name, "error": errMsg})
 				working = append(working, map[string]any{"role": "tool", "tool_name": call.Function.Name, "content": errMsg})
+				if toolFailures >= 4 {
+					break toolLoop
+				}
 				continue
 			}
 
@@ -520,9 +528,13 @@ func (s *Server) runAgent(
 				Error:      errString(err),
 			})
 			if err != nil {
+				toolFailures++
 				log.Printf("tool %s failed: %v", call.Function.Name, err)
 				_ = writeSSE(map[string]any{"status": "tool_error", "tool": call.Function.Name, "error": err.Error()})
 				working = append(working, map[string]any{"role": "tool", "tool_name": call.Function.Name, "content": "Tool error: " + err.Error()})
+				if toolFailures >= 4 {
+					break toolLoop
+				}
 				continue
 			}
 
@@ -538,8 +550,10 @@ func (s *Server) runAgent(
 			}
 			_ = writeSSE(event)
 
-			// Notify UI to refresh explorer/editor when files change.
-			if data, ok := result.Data.(map[string]any); ok {
+			// Notify UI only for actual writes. Read/list results also contain a
+			// path, but must not be presented as changed files.
+			if result.Kind == "file_write" || result.Kind == "file_edit" {
+				data, _ := result.Data.(map[string]any)
 				if path, _ := data["path"].(string); path != "" {
 					_ = writeSSE(map[string]any{"status": "file_changed", "path": path})
 				}
@@ -548,7 +562,34 @@ func (s *Server) runAgent(
 			working = append(working, map[string]any{"role": "tool", "tool_name": call.Function.Name, "content": result.Content})
 		}
 	}
-	return agentResult{}, fmt.Errorf("tool loop exceeded %d rounds", maxToolRounds)
+
+	// A weak model can keep calling tools forever or return no final content.
+	// Give it one tool-free chance to summarize what happened. If even that
+	// fails, emit a useful local fallback so the chat turn never disappears.
+	working = append(working, map[string]any{
+		"role": "system",
+		"content": "Tool execution has stopped. Do not call any more tools. " +
+			"Answer the user's original request now using the information available. " +
+			"If the task could not be completed, briefly explain why and suggest a next step.",
+	})
+	onThinking := func(text string) error {
+		return writeSSE(map[string]any{"status": "thinking", "thinking": text})
+	}
+	content, finalStats, finalErr := s.ollama.StreamChat(ctx, model, working, options, onToken, onThinking)
+	stats.Add(finalStats)
+	if finalErr == nil && strings.TrimSpace(content) != "" {
+		return agentResult{Content: content, Trace: trace, Stats: stats}, nil
+	}
+
+	fallback := "I couldn't complete this request because the local model became stuck while using tools."
+	if toolFailures > 0 {
+		fallback += fmt.Sprintf(" %d tool call(s) failed.", toolFailures)
+	}
+	fallback += " Try a larger tool-capable model or rephrase the request."
+	if err := streamTextChunks(ctx, fallback, onToken); err != nil {
+		return agentResult{Content: fallback, Trace: trace, Stats: stats}, err
+	}
+	return agentResult{Content: fallback, Trace: trace, Stats: stats}, nil
 }
 
 func summarizeToolArgsForUI(args map[string]any) map[string]any {

@@ -131,7 +131,8 @@ func (c *OllamaClient) CheckHealth() bool {
 }
 
 func (c *OllamaClient) ListModels() ([]map[string]any, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := *c.httpClient
+	client.Timeout = 30 * time.Second
 	resp, err := client.Get(c.baseURL + "/api/tags")
 	if err != nil {
 		return nil, err

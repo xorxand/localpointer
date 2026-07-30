@@ -1148,8 +1148,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.runAgent(ctx, model, messages, fs, nil, req.Plan, req.Message, autoApprove, writeSSE, onToken)
 	if err != nil && !errors.Is(err, context.Canceled) {
-		_ = writeSSE(map[string]any{"error": err.Error()})
-		return
+		// SSE headers are already committed, so an error-only event can leave
+		// the chat with no rendered response. Always provide visible turn text.
+		message := "The local model could not finish this request: " + err.Error()
+		_ = onToken(message)
+		result.Content = message
 	}
 	content := full.String()
 	if content == "" {

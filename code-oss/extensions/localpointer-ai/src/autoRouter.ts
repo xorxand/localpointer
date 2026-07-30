@@ -242,8 +242,8 @@ export async function routeAutoModel(
 		throw new Error('No Ollama models available. Pull one with `ollama pull`.');
 	}
 
-	const ranked = rankModels(usable);
-	const classifierModel = pickClassifierModel(ranked);
+	const allRanked = rankModels(usable);
+	const classifierModel = pickClassifierModel(allRanked);
 	let complexity = heuristicComplexity(prompt);
 	let reason = 'heuristic';
 
@@ -255,6 +255,10 @@ export async function routeAutoModel(
 		}
 	}
 
+	// Sub-3B models are useful classifiers, but commonly get stuck in tool
+	// loops. Keep them out of the agent pool whenever a larger model exists.
+	const agentSized = allRanked.filter(model => model.cost >= 3);
+	const ranked = agentSized.length > 0 ? agentSized : allRanked;
 	const picked = pickByMode(ranked, complexity, mode);
 	return {
 		model: picked.name,

@@ -226,12 +226,14 @@ async function parseSSE(
 				if (!payload) {
 					continue;
 				}
+				let event: DaemonSSEEvent;
 				try {
-					const event = JSON.parse(payload) as DaemonSSEEvent;
-					await onEvent(event);
+					event = JSON.parse(payload) as DaemonSSEEvent;
 				} catch {
 					// ignore malformed SSE chunks
+					continue;
 				}
+				await onEvent(event);
 			}
 		}
 	}
