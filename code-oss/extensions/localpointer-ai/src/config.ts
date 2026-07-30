@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { AutoOptimizeMode, isAutoModelId, parseAutoModeFromModelId, routeAutoModel } from './autoRouter';
-import { OllamaClient } from './ollama';
+import { isLocalOllamaModel, OllamaClient } from './ollama';
 
 export interface LocalPointerConfig {
 	daemonUrl: string;
@@ -88,6 +88,9 @@ export async function resolveRequestModel(
 	const cfg = getConfig();
 	const configured = (options?.configured ?? cfg.model).trim();
 	if (configured && !isAutoModelId(configured)) {
+		if (!isLocalOllamaModel(configured)) {
+			throw new Error(`Cloud model "${configured}" is unavailable in local-only mode. Select Auto or a locally installed model.`);
+		}
 		return { model: configured, routedFromAuto: false };
 	}
 

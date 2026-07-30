@@ -16,6 +16,7 @@ interface ChatMessage {
 	role: 'user' | 'assistant' | 'system';
 	content: string;
 	thinking?: string;
+	errorDetails?: string;
 	activity?: {
 		summary: string;
 		entries: string[];
@@ -245,6 +246,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		let model = this.selectedModel;
 		let assistant = '';
 		let assistantThinking = '';
+		let assistantErrorDetails: string | undefined;
 		let stats: Record<string, unknown> | undefined;
 		let trace: unknown[] | undefined;
 		let assistantActivity: { summary: string; entries: string[] } | undefined;
@@ -326,8 +328,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				assistant = '(empty response from model)';
 			}
 		} catch (err) {
-			const msg = String(err);
-			assistant = signal.aborted || gen !== this.sendGen ? '(cancelled)' : `Error: ${msg}`;
+			assistant = signal.aborted || gen !== this.sendGen
+				? '(cancelled)'
+				: 'LocalPointer could not complete the request. Expand Error details below.';
+			assistantErrorDetails = signal.aborted ? undefined : formatError(err);
 			if (gen === this.sendGen) {
 				this.postStatus(assistant);
 			}
@@ -344,12 +348,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			role: 'assistant',
 			content: assistant,
 			thinking: assistantThinking.trim() || undefined,
+			errorDetails: assistantErrorDetails,
 			activity: assistantActivity,
 		});
 		setLastTransparency({ model, stats, trace, source: 'chatView' });
 		this.postMessage({ type: 'messages', messages: this.messages });
 		this.postMessage({ type: 'streaming', active: false });
-		if (!assistant.startsWith('Error:') && assistant !== '(cancelled)') {
+		if (!assistantErrorDetails && assistant !== '(cancelled)') {
 			this.postStatus(`Done · ${model}`);
 		}
 		this.abort = undefined;
@@ -598,4 +603,11 @@ function isToolStatus(status: string | undefined): boolean {
 		|| status === 'approved'
 		|| status === 'approval_required'
 		|| status === 'file_changed';
+}
+
+function formatError(error: unknown): string {
+	if (error instanceof Error) {
+		return error.stack || error.message;
+	}
+	return String(error);
 }

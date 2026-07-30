@@ -12,6 +12,7 @@ import { ToolActivityCollector } from './toolActivity';
 
 const TOOL_THINKING_ID = 'localpointer-tools';
 const MODEL_THINKING_ID = 'localpointer-thinking';
+const ERROR_DETAILS_ID = 'localpointer-error';
 
 export class ChatParticipantService implements vscode.Disposable {
 	private participant: vscode.ChatParticipant | undefined;
@@ -41,7 +42,7 @@ export class ChatParticipantService implements vscode.Disposable {
 					stream.markdown(`_LocalPointer · ${model}_\n\n`);
 				}
 			} catch (err) {
-				stream.markdown(`**Error:** ${String(err)}`);
+				emitExpandableError(stream, err);
 				return;
 			}
 
@@ -92,11 +93,16 @@ export class ChatParticipantService implements vscode.Disposable {
 				}
 			} catch (err) {
 				if (!controller.signal.aborted) {
-					await this.streamOllamaFallback(request.prompt, model, stream, controller.signal, chunk => {
-						full += chunk;
-					});
 					if (!full) {
-						stream.markdown(`**Error:** ${String(err)}`);
+						try {
+							await this.streamOllamaFallback(request.prompt, model, stream, controller.signal, chunk => {
+								full += chunk;
+							});
+						} catch (fallbackErr) {
+							emitExpandableError(stream, fallbackErr, err);
+						}
+					} else {
+						emitExpandableError(stream, err);
 					}
 				}
 			} finally {
@@ -144,6 +150,30 @@ export class ChatParticipantService implements vscode.Disposable {
 	dispose(): void {
 		this.participant?.dispose();
 	}
+}
+
+function emitExpandableError(
+	stream: vscode.ChatResponseStream,
+	error: unknown,
+	previousError?: unknown,
+): void {
+	stream.markdown('LocalPointer could not complete the request. Expand **Error details** below.\n\n');
+	const details = [
+		previousError ? `Daemon error:\n${formatError(previousError)}` : '',
+		`Request error:\n${formatError(error)}`,
+	].filter(Boolean).join('\n\n');
+	stream.thinkingProgress({
+		id: ERROR_DETAILS_ID,
+		text: details,
+		metadata: { title: 'Error details' },
+	});
+}
+
+function formatError(error: unknown): string {
+	if (error instanceof Error) {
+		return error.stack || error.message;
+	}
+	return String(error);
 }
 
 function isToolStatus(status: string | undefined): boolean {

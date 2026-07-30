@@ -148,7 +148,16 @@ func (c *OllamaClient) ListModels() ([]map[string]any, error) {
 		return nil, err
 	}
 
-	models := data.Models
+	models := make([]map[string]any, 0, len(data.Models))
+	for _, model := range data.Models {
+		name, _ := model["name"].(string)
+		if name == "" {
+			name, _ = model["model"].(string)
+		}
+		if name != "" && !isCloudModelName(name) {
+			models = append(models, model)
+		}
+	}
 	sort.Slice(models, func(i, j int) bool {
 		speedI := modelSpeedScore(models[i])
 		speedJ := modelSpeedScore(models[j])
@@ -160,6 +169,11 @@ func (c *OllamaClient) ListModels() ([]map[string]any, error) {
 		return nameI < nameJ
 	})
 	return models, nil
+}
+
+func isCloudModelName(name string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	return strings.HasSuffix(normalized, ":cloud") || strings.HasSuffix(normalized, "-cloud")
 }
 
 func parseParameterSizeB(raw string) float64 {

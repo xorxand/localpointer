@@ -6,7 +6,7 @@
  *  then we pick from the installed pool based on Optimize For mode (cost/balance/intelligence).
  *--------------------------------------------------------------------------------------------*/
 
-import { OllamaClient } from './ollama';
+import { isLocalOllamaModel, OllamaClient } from './ollama';
 
 export type AutoOptimizeMode = 'cost' | 'balance' | 'intelligence';
 
@@ -236,7 +236,7 @@ export async function routeAutoModel(
 	const names = await ollama.listModels();
 	const usable = names.filter(n => {
 		const l = n.toLowerCase();
-		return !l.includes('embed') && !l.includes('whisper');
+		return isLocalOllamaModel(n) && !l.includes('embed') && !l.includes('whisper');
 	});
 	if (usable.length === 0) {
 		throw new Error('No Ollama models available. Pull one with `ollama pull`.');

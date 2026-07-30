@@ -403,6 +403,9 @@ func (s *Server) handleInlineEdit(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) resolveModel(requested string) (string, error) {
 	model := strings.TrimSpace(requested)
+	if isCloudModelName(model) {
+		return "", fmt.Errorf("cloud model %q is unavailable in LocalPointer local-only mode", model)
+	}
 	if model != "" {
 		return model, nil
 	}
@@ -1064,6 +1067,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		}
 		// Prefer a tools-capable mid-size model.
 		model = pickDefaultModel(models)
+	}
+	if isCloudModelName(model) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": fmt.Sprintf("cloud model %q is unavailable in LocalPointer local-only mode", model),
+		})
+		return
 	}
 
 	userContent := req.Message

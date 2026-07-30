@@ -219,7 +219,7 @@
     }
     for (const m of msgs) {
       const div = document.createElement('div');
-      const isErr = m.role === 'assistant' && String(m.content).startsWith('Error:');
+      const isErr = m.role === 'assistant' && (String(m.content).startsWith('Error:') || !!m.errorDetails);
       div.className = 'msg ' + m.role + (isErr ? ' error' : '');
       div.innerHTML =
         '<div class="role">' + escapeHtml(m.role) + '</div>';
@@ -251,6 +251,18 @@
         thinkingBody.textContent = m.thinking;
         details.appendChild(summary);
         details.appendChild(thinkingBody);
+        div.insertBefore(details, div.firstChild.nextSibling);
+      }
+      if (m.errorDetails) {
+        const details = document.createElement('details');
+        details.className = 'thinking-activity error-details';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Error details';
+        const errorBody = document.createElement('div');
+        errorBody.className = 'thinking-activity-body';
+        errorBody.textContent = m.errorDetails;
+        details.appendChild(summary);
+        details.appendChild(errorBody);
         div.insertBefore(details, div.firstChild.nextSibling);
       }
       const content = document.createElement('div');

@@ -36,6 +36,11 @@ interface OllamaChatChunk {
 	eval_count?: number;
 }
 
+export function isLocalOllamaModel(name: string): boolean {
+	const normalized = name.trim().toLowerCase();
+	return normalized !== '' && !normalized.endsWith(':cloud') && !normalized.endsWith('-cloud');
+}
+
 export class OllamaClient {
 	constructor(private readonly baseUrl: string) { }
 
@@ -58,7 +63,9 @@ export class OllamaClient {
 			throw new Error(`Ollama tags failed: ${resp.status}`);
 		}
 		const data = (await resp.json()) as OllamaTagsResponse;
-		return (data.models ?? []).map(m => m.name || m.model).filter(Boolean);
+		return (data.models ?? [])
+			.map(m => m.name || m.model)
+			.filter((name): name is string => Boolean(name) && isLocalOllamaModel(name));
 	}
 
 	async chat(model: string, messages: OllamaMessage[], signal?: AbortSignal): Promise<string> {
